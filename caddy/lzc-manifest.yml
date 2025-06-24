@@ -1,0 +1,21 @@
+name: Caddy
+package: com.github.moonfruit.caddy
+version: 2.10.0
+description: Fast and extensible multi-platform HTTP/1-2-3 web server with automatic HTTPS
+license: https://choosealicense.com/licenses/apache-2.0/
+homepage: https://github.com/caddyserver/caddy
+author: MoonFruit
+application:
+  subdomain: caddy
+  background_task: true
+  multi_instance: true
+  routes:
+    - /=http://caddy
+services:
+  caddy:
+    image: caddy:2.10.0
+    binds:
+      - /lzcapp/var/config:/config
+      - /lzcapp/var/data:/data
+      - /lzcapp/run/mnt/home/Config/caddy:/etc/caddy
+      - /lzcapp/run/mnt/home/Public:/srv
