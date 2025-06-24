@@ -19,3 +19,18 @@ services:
       - /lzcapp/var/data:/data
       - /lzcapp/run/mnt/home/Config/caddy:/etc/caddy
       - /lzcapp/run/mnt/home/Public:/srv
+    setup_script: |
+      if [ ! -f /etc/caddy/Caddyfile ]; then
+        cat <<EOF > /etc/caddy/Caddyfile
+      :80 {
+          root * /srv
+          file_server browse
+          handle /api/shutdown {
+              rewrite * /stop_my_self
+              reverse_proxy unix//lzcapp/run/lzc-init.sock {
+                  header_up Host localhost
+              }
+          }
+      }
+      EOF
+      fi
