@@ -1,0 +1,16 @@
+name: HttpBin
+package: com.github.moonfruit.httpbin
+version: 0.9.2
+description: HTTP Request & Response Service, written in Python + Flask
+license: https://choosealicense.com/licenses/isc/
+homepage: https://github.com/postmanlabs/httpbin
+author: MoonFruit
+application:
+  subdomain: httpbin
+  public_path:
+    - /
+  routes:
+    - /=http://httpbin.com.github.moonfruit.httpbin.lzcapp
+services:
+  httpbin:
+    image: kennethreitz/httpbin:latest
