@@ -10,7 +10,7 @@ application:
   background_task: true
   multi_instance: true
   routes:
-    - /=http://caddy
+    - /=http://caddy.com.github.moonfruit.caddy.lzcapp
 services:
   caddy:
     image: caddy:2.10.0
