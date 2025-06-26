@@ -21,6 +21,8 @@ echo "Using version: $VERSION"
 echo
 
 if [[ $1 != "-N" ]]; then
-    echo " --- === Result === ---"
-    git diff lzc-manifest.yml
+    if ! git diff --quiet lzc-manifest.yml; then
+        echo " --- === Result === ---"
+        git diff lzc-manifest.yml
+    fi
 fi

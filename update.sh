@@ -8,5 +8,6 @@ fd -tf update.sh | while read -r MODULE; do
     (cd "$DIR" && ./update.sh -N)
 done
 
-echo "-------- git diff --------"
-git diff
+if ! git diff --quiet; then
+    git diff
+fi

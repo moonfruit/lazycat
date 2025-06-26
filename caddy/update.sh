@@ -7,12 +7,15 @@ source "$ENV/lib/bash/github.sh"
 
 echo " --- === Updating Caddy === ---"
 VERSION=$(find-latest-version caddyserver caddy)
-sed -e 's|\(image: caddy:\).*|\1'"$VERSION"'|' \
+sed -e 's/^version:.*/version: '"$VERSION"'/;' \
+    -e 's|\(image: caddy:\).*|\1'"$VERSION"'|' \
     -i lzc-manifest.yml
 echo "Using version: $VERSION"
 echo
 
 if [[ $1 != "-N" ]]; then
-    echo " --- === Result === ---"
-    git diff lzc-manifest.yml
+    if ! git diff --quiet lzc-manifest.yml; then
+        echo " --- === Result === ---"
+        git diff lzc-manifest.yml
+    fi
 fi
