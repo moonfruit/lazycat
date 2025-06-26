@@ -46,6 +46,7 @@ jobs:
         with:
           cache-from: type=gha,scope=aria2
           cache-to: type=gha,scope=aria2,mode=max
+          context: aria2/docker
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
