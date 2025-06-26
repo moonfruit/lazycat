@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/build-aria2.yml'
-      - 'aria2/docker/Dockerfile'
+      - ".github/workflows/build-aria2.yml"
+      - "aria2/docker/Dockerfile"
   workflow_dispatch:
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       - name: Extract version
         id: extract
         run: |
-          VERSION=$(grep -oP '(?<=^ARG VERSION=).*' aria2/docker/Dockerfile)
+          VERSION=$(grep -oP '(?<=^ENV VERSION=).*' aria2/docker/Dockerfile)
           echo "VERSION=$VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
