@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract version
-        id: info
+        id: extract
         run: |
           VERSION=$(grep -oP '(?<=^ARG VERSION=).*' aria2/docker/Dockerfile)
           echo "VERSION=$VERSION"
@@ -42,6 +42,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push
+        id: build-and-push
         uses: docker/build-push-action@v6
         with:
           cache-from: type=gha,scope=aria2
@@ -50,5 +51,12 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.actor }}/aria2:${{ steps.info.outputs.version }}
+            ghcr.io/${{ github.actor }}/aria2:${{ steps.extract.outputs.version }}
             ghcr.io/${{ github.actor }}/aria2:latest
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/${{ github.actor }}/aria2
+          subject-digest: ${{ steps.build-and-push.outputs.digest }}
+          push-to-registry: true
