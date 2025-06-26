@@ -12,5 +12,7 @@ sed -e 's|\(image: caddy:\).*|\1'"$VERSION"'|' \
 echo "Using version: $VERSION"
 echo
 
-echo " --- === Result === ---"
-git diff lzc-manifest.yml
+if [[ $1 != "-N" ]]; then
+    echo " --- === Result === ---"
+    git diff lzc-manifest.yml
+fi
