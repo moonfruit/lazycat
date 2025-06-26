@@ -54,7 +54,7 @@ jobs:
             ghcr.io/${{ github.actor }}/aria2:${{ steps.extract.outputs.version }}
             ghcr.io/${{ github.actor }}/aria2:latest
 
-      - name: Generate artifact attestation
+      - name: Generate attestation
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ghcr.io/${{ github.actor }}/aria2
