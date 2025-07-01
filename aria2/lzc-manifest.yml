@@ -1,0 +1,27 @@
+name: AriaNg
+package: com.github.moonfruit.ariang
+version: 1.37.0
+description: AriaNg, a modern web frontend making aria2 easier to use
+license: https://choosealicense.com/licenses/gpl-3.0/
+homepage: https://github.com/mayswind/AriaNg
+author: MoonFruit
+application:
+  subdomain: aria2
+  routes:
+    - /=file:///lzcapp/pkg/content/ariang
+    - /rpc=http://caddy/rpc
+    - /jsonrpc=http://caddy/jsonrpc
+services:
+  aria2:
+    image: ghcr.io/moonfruit/aria2:1.37.0-r1
+    binds:
+      - /lzcapp/pkg/content/aria2:/pkg
+      - /lzcapp/var/aria2:/root/.aria2
+      - /lzcapp/run/mnt/home/Downloads:/downloads
+    setup_script: /pkg/init.sh
+  caddy:
+    image: caddy:2.10.0
+    binds:
+      - /lzcapp/pkg/content/caddy:/etc/caddy
+      - /lzcapp/var/caddy/config:/config
+      - /lzcapp/var/caddy/data:/data

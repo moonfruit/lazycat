@@ -1,0 +1,17 @@
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	@rpc {
+		path /rpc
+		path /rpc/
+		path /jsonrpc
+		path /jsonrpc/
+	}
+	handle @rpc {
+		uri strip_suffix /
+		reverse_proxy http://aria2:6880
+	}
+}
