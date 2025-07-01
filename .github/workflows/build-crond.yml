@@ -24,7 +24,7 @@ jobs:
       - name: Extract version
         id: extract
         run: |
-          VERSION=$(grep -oP '(?<=CROND_VERSION=)\S*' docker/crond/Dockerfile)
+          VERSION=$(grep -oP '(?<=CURL_VERSION=)\S*' docker/crond/Dockerfile)
           echo "VERSION=$VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
