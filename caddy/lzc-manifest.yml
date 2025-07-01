@@ -15,7 +15,7 @@ services:
   caddy:
     image: caddy:2.10.0
     binds:
-      - /lzcapp/pkg/content:/pkg
+      - /lzcapp/pkg/content/caddy:/pkg
       - /lzcapp/var/config:/config
       - /lzcapp/var/data:/data
       - /lzcapp/var/caddy:/etc/caddy

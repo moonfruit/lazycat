@@ -15,7 +15,7 @@
 
 	redir /admin /admin/
 	handle_path /admin/* {
-		root * /pkg
+		root * /pkg/admin
 		file_server
 	}
 }
