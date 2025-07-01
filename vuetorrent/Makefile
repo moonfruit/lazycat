@@ -1,6 +1,6 @@
 all: app.lpk
 
-app.lpk: lzc-* dist/*
+app.lpk: lzc-* dist/vue/*
 	lzc-cli project build -o app.lpk
 
 clean:
