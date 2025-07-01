@@ -11,6 +11,10 @@ application:
   multi_instance: true
   routes:
     - /=http://caddy.com.github.moonfruit.caddy.lzcapp
+  ingress:
+    - protocol: tcp
+      service: caddy
+      port: 2019
 services:
   caddy:
     image: caddy:2.10.0
