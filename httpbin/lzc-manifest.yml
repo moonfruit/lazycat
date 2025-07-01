@@ -13,4 +13,4 @@ application:
     - /=http://httpbin.com.github.moonfruit.httpbin.lzcapp
 services:
   httpbin:
-    image: kennethreitz/httpbin:latest
+    image: kennethreitz/httpbin
