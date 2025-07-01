@@ -7,6 +7,8 @@ homepage: https://github.com/mayswind/AriaNg
 author: MoonFruit
 application:
   subdomain: aria2
+  background_task: true
+  multi_instance: true
   routes:
     - /=file:///lzcapp/pkg/content/ariang
     - /rpc=http://caddy/rpc

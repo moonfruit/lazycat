@@ -16,7 +16,7 @@ echo " --- === Updating aria2 === ---"
 VERSION=$(curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/v${VERSION%.*}/community/x86_64/APKINDEX.tar.gz" 2>/dev/null |
     tar -xzO |
     awk '$1 == "P:aria2" { found = 1 }; found && $1 ~ /^V:/ { print substr($1, 3); exit }')
-sed -e 's|\(VERSION=\).*|\1'"$VERSION"'|' -i docker/Dockerfile
+sed -e 's|\(ARIA2_VERSION=\).*|\1'"$VERSION"'|' -i docker/Dockerfile
 echo "Using version: $VERSION"
 echo
 
