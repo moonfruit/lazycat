@@ -1,6 +1,8 @@
+DIST := $(shell fd -tf . dist)
+
 all: app.lpk
 
-app.lpk: lzc-* dist/vue/*
+app.lpk: lzc-* $(DIST)
 	lzc-cli project build -o app.lpk
 
 clean:
