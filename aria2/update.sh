@@ -35,13 +35,8 @@ echo "Using version: $VERSION"
 echo
 
 if [[ $1 != "-N" ]]; then
-    if ! git diff --quiet; then
+    if ! git diff --quiet lzc-manifest.yml docker/Dockerfile; then
         echo " --- === Result === ---"
-        if git diff --quiet lzc-manifest.yml; then
-            echo "No changes in lzc-manifest.yml"
-        else
-            git diff lzc-manifest.yml
-        fi
-        git diff
+        git diff lzc-manifest.yml docker/Dockerfile
     fi
 fi

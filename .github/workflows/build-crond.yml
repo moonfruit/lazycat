@@ -1,12 +1,12 @@
-name: Build image for aria2
+name: Build image for crond
 
 on:
   push:
     branches:
       - main
     paths:
-      - ".github/workflows/build-aria2.yml"
-      - "aria2/docker/Dockerfile"
+      - ".github/workflows/build-crond.yml"
+      - "docker/crond/Dockerfile"
   workflow_dispatch:
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       - name: Extract version
         id: extract
         run: |
-          VERSION=$(grep -oP '(?<=ARIA2_VERSION=)\S*' aria2/docker/Dockerfile)
+          VERSION=$(grep -oP '(?<=CROND_VERSION=)\S*' docker/crond/Dockerfile)
           echo "VERSION=$VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
@@ -45,18 +45,18 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v6
         with:
-          cache-from: type=gha,scope=aria2
-          cache-to: type=gha,scope=aria2,mode=max
-          context: aria2/docker
+          cache-from: type=gha,scope=crond
+          cache-to: type=gha,scope=crond,mode=max
+          context: docker/crond
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.actor }}/aria2:${{ steps.extract.outputs.version }}
-            ghcr.io/${{ github.actor }}/aria2:latest
+            ghcr.io/${{ github.actor }}/crond:${{ steps.extract.outputs.version }}
+            ghcr.io/${{ github.actor }}/crond:latest
 
       - name: Generate attestation
         uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ghcr.io/${{ github.actor }}/aria2
+          subject-name: ghcr.io/${{ github.actor }}/crond
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
           push-to-registry: true
