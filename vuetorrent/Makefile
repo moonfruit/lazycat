@@ -1,6 +1,6 @@
 all: app.lpk
 
-app.lpk: lzc-* scripts/*
+app.lpk: lzc-* dist/*
 	lzc-cli project build -o app.lpk
 
 clean:

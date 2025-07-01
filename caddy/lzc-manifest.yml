@@ -18,6 +18,6 @@ services:
       - /lzcapp/pkg/content:/pkg
       - /lzcapp/var/config:/config
       - /lzcapp/var/data:/data
-      - /lzcapp/run/mnt/home/Config/caddy:/etc/caddy
+      - /lzcapp/var/caddy:/etc/caddy
       - /lzcapp/run/mnt/home/Public:/srv
     setup_script: /pkg/init.sh
