@@ -15,25 +15,9 @@ services:
   caddy:
     image: caddy:2.10.0
     binds:
+      - /lzcapp/pkg/content:/pkg
       - /lzcapp/var/config:/config
       - /lzcapp/var/data:/data
       - /lzcapp/run/mnt/home/Config/caddy:/etc/caddy
       - /lzcapp/run/mnt/home/Public:/srv
-    setup_script: |
-      if [ ! -f /etc/caddy/Caddyfile ]; then
-        cat <<EOF > /etc/caddy/Caddyfile
-      {
-      	auto_https off
-      }
-      :80 {
-      	root * /srv
-      	file_server browse
-      	handle /api/shutdown {
-      		rewrite * /stop_my_self
-      		reverse_proxy unix//lzcapp/run/lzc-init.sock {
-      			header_up Host localhost
-      		}
-      	}
-      }
-      EOF
-      fi
+    setup_script: /pkg/init.sh

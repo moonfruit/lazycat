@@ -1,0 +1,21 @@
+{
+	auto_https off
+}
+
+:80 {
+	root * /srv
+	file_server browse
+
+	handle /admin/shutdown {
+		rewrite * /stop_my_self
+		reverse_proxy unix//lzcapp/run/lzc-init.sock {
+			header_up Host localhost
+		}
+	}
+
+	redir /admin /admin/
+	handle_path /admin/* {
+		root * /pkg
+		file_server
+	}
+}
