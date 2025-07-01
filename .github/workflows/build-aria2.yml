@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/build-aria2.yml"
-      - "aria2/docker/Dockerfile"
+      - "docker/aria2/Dockerfile"
   workflow_dispatch:
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       - name: Extract version
         id: extract
         run: |
-          VERSION=$(grep -oP '(?<=ARIA2_VERSION=)\S*' aria2/docker/Dockerfile)
+          VERSION=$(grep -oP '(?<=ARIA2_VERSION=)\S*' docker/aria2/Dockerfile)
           echo "VERSION=$VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
@@ -47,7 +47,7 @@ jobs:
         with:
           cache-from: type=gha,scope=aria2
           cache-to: type=gha,scope=aria2,mode=max
-          context: aria2/docker
+          context: docker/aria2
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
