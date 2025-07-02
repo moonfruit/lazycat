@@ -1,4 +1,4 @@
-DIST := $(shell fd -tf . dist)
+DIST := $(shell fd -utf . dist)
 
 all: app.lpk
 
