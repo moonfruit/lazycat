@@ -1,1 +1,1 @@
-* * * * * echo "Hello, World!" >> /proc/1/fd/1 2>&1
+* * * * * echo "Hello, World!" >>/proc/1/fd/1 2>&1
