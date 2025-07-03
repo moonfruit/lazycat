@@ -27,7 +27,7 @@ services:
       - /lzcapp/pkg/content/crond:/etc/crontabs
     depends_on:
       - aria2
-    setup_script: /etc/crontabs/update.sh
+    setup_script: /etc/crontabs/update-settings.sh
   caddy:
     image: caddy:2.10.0
     binds:
