@@ -1,8 +1,6 @@
-# lazycat-httpbin
-HttpBin for Lazycat
+# lazycat-aria2
+Aria2 for Lazycat
 
 ## TODO:
 
-* 自动更新 bt-tracker=
-* 自动更新 bt-external-ip=
 * 持久化配置
