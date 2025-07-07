@@ -2,6 +2,11 @@
 fetch() {
     local key="$1"
     local url="$2"
+
+    if [[ -z "$url" ]]; then
+        return 1
+    fi
+
     local value
     if value=$(curl -fsSL "$url") && [[ -n "$value" ]]; then
         if [[ -z "$SETTINGS" ]]; then
@@ -13,8 +18,8 @@ fetch() {
     fi
 }
 
-fetch bt-external-ip ipv4.ip.sb
-fetch bt-tracker https://fastly.jsdelivr.net/gh/XIU2/TrackersListCollection/best_aria2.txt
+fetch bt-external-ip "${IP_URL:-ipv4.ip.sb}"
+fetch bt-tracker "${TRACKER_URL:-https://fastly.jsdelivr.net/gh/XIU2/TrackersListCollection/best_aria2.txt}"
 
 if [[ -n "$SETTINGS" ]]; then
     ID=$(date +%s)
