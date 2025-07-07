@@ -4,10 +4,11 @@ fetch() {
     local url="$2"
     local value
     if value=$(curl -fsSL "$url") && [[ -n "$value" ]]; then
-        if [[ -n "$SETTINGS" ]]; then
-            SETTINGS="$SETTINGS,"
+        if [[ -z "$SETTINGS" ]]; then
+            SETTINGS="\"$key\":\"$value\""
+        else
+            SETTINGS="$SETTINGS,\"$key\":\"$value\""
         fi
-        SETTINGS="$SETTINGS\"$key\":\"$value\""
         echo "$key=$value"
     fi
 }
