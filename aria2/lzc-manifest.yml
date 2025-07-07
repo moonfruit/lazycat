@@ -11,8 +11,13 @@ application:
   multi_instance: true
   routes:
     - /=file:///lzcapp/pkg/content/ariang
-    - /rpc=http://caddy/rpc
-    - /jsonrpc=http://caddy/jsonrpc
+  upstreams:
+    - location: /rpc
+      backend: http://aria2:6800/rpc
+      trim_url_suffix: /
+    - location: /jsonrpc
+      backend: http://aria2:6800/jsonrpc
+      trim_url_suffix: /
 services:
   aria2:
     image: ghcr.io/moonfruit/aria2:1.37.0-r1
@@ -28,9 +33,3 @@ services:
     depends_on:
       - aria2
     setup_script: /etc/crontabs/update-settings.sh
-  caddy:
-    image: caddy:2.10.0
-    binds:
-      - /lzcapp/pkg/content/caddy:/etc/caddy
-      - /lzcapp/var/caddy/config:/config
-      - /lzcapp/var/caddy/data:/data
