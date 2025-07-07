@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
-cat <<EOF >>/config/qBittorrent/qBittorrent.conf
+CONFIG=/config/qBittorrent/qBittorrent.conf
+
+if grep -F 'WebUI\Password_PBKDF2' $CONFIG >/dev/null; then
+    echo "qBittorrent already initialized."
+    exit 0
+fi
+
+echo "Initializing qBittorrent configuration..."
+
+echo "Set download directory to '/home/Downloads'"
+mkdir -p /home/Downloads
+sed -i "s#/downloads/#/home/Downloads/#" $CONFIG
+
+echo "Setting WEBUI username/password to 'admin/admin'"
+cat <<EOF >>$CONFIG
 WebUI\AuthSubnetWhitelist=0.0.0.0/0, ::/0
 WebUI\AuthSubnetWhitelistEnabled=true
 WebUI\LocalHostAuth=false
