@@ -1,0 +1,15 @@
+params:
+  - id: GithubAuth
+    type: string
+    name: Github Token
+    description: |-
+      Create a Github PAT with your account to increase API rate limit fine-grained token with public repo access is enough.
+      https://github.com/settings/personal-access-tokens/new"
+    optional: true
+locales:
+  zh:
+    github.auth:
+      name: Github 令牌
+      description: |-
+        使用你的账户创建一个 GitHub PAT（个人访问令牌）以提高 API 速率限制，仅需具有公开仓库访问权限的细粒度令牌即可。
+        https://github.com/settings/personal-access-tokens/new

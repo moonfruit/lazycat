@@ -4,7 +4,7 @@ Lazycat Apps
 
 ## TODO:
 
-- Jenkins
+- Gitlab
 - Home Assistant with mi-home extension
 - Jellyfin
 - OpenList
