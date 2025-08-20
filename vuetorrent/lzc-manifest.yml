@@ -1,6 +1,6 @@
 name: VueTorrent
 package: com.github.moonfruit.vuetorrent
-version: 2.6.0
+version: 2.7.0
 description: The sleekest looking WEBUI for qBittorrent made with Vuejs!
 license: https://choosealicense.com/licenses/gpl-3.0/
 homepage: https://github.com/VueTorrent/vuetorrent-backend
@@ -13,7 +13,7 @@ application:
     - /=http://vue
 services:
   qbit:
-    image: lscr.io/linuxserver/qbittorrent:5.1.2-r1-ls407
+    image: lscr.io/linuxserver/qbittorrent:5.1.2-r1-ls410
     environment:
       - PUID=0
       - PGID=0
@@ -25,7 +25,7 @@ services:
       - /lzcapp/var/qbittorrent:/config
       - /lzcapp/run/mnt/home:/home
   vue:
-    image: ghcr.io/vuetorrent/vuetorrent-backend:2.6.0
+    image: ghcr.io/vuetorrent/vuetorrent-backend:2.7.0
     environment:
       - TZ=Asia/Shanghai
       - PORT=80
