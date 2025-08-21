@@ -19,7 +19,7 @@ fetch() {
 }
 
 fetch bt-external-ip "${IP_URL:-ipv4.ip.sb}"
-fetch bt-tracker "${TRACKER_URL:-https://fastly.jsdelivr.net/gh/XIU2/TrackersListCollection/best_aria2.txt}"
+fetch bt-tracker "${TRACKER_URL:-https://cdn.jsdelivr.net/gh/XIU2/TrackersListCollection/best_aria2.txt}"
 
 if [[ -n "$SETTINGS" ]]; then
     ID=$(date +%s)
