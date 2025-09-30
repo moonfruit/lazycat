@@ -32,9 +32,9 @@ services:
       - QBIT_BASE=http://qbit
       - RELEASE_TYPE=stable
       - UPDATE_VT_CRON=0 * * * *
-      {{ if .U.GithubToken }}
+      {{- if .U.GithubToken }}
       - GITHUB_AUTH={{ .U.GithubAuth }}
-      {{ end }}
+      {{- end }}
     binds:
       - /lzcapp/var/config:/config
       - /lzcapp/var/vuetorrent:/vuetorrent

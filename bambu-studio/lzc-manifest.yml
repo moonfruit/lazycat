@@ -1,0 +1,25 @@
+name: BambuStudio
+package: com.github.moonfruit.bambustudio
+version: 2.2.2.56
+description: The open-source, cutting-edge, feature-rich slicing software for 3D printers.
+license: https://choosealicense.com/licenses/agpl-3.0/
+homepage: https://github.com/bambulab/BambuStudio
+author: MoonFruit
+application:
+  subdomain: bambu-studio
+  gpu_accel: true
+  upstreams:
+    - location: /
+      backend: https://studio:3001
+      disable_backend_ssl_verify: true
+services:
+  studio:
+    image: lscr.io/linuxserver/bambustudio:v02.02.02.56-ls110
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=Asia/Shanghai
+      - DARK_MODE=true
+      - LC_ALL=zh_CN.UTF-8
+    binds:
+      - /lzcapp/var/config:/config
