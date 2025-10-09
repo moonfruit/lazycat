@@ -4,152 +4,46 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>系统重启</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        color: #333;
-      }
-
-      .container {
-        background: white;
-        padding: 60px 40px;
-        border-radius: 20px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-        text-align: center;
-        max-width: 400px;
-        width: 90%;
-      }
-
-      .title {
-        font-size: 28px;
-        font-weight: 600;
-        margin-bottom: 30px;
-        color: #2c3e50;
-      }
-
-      .restart-btn {
-        background: linear-gradient(45deg, #ff6b6b, #ee5a52);
-        color: white;
-        border: none;
-        padding: 20px 40px;
-        font-size: 20px;
-        font-weight: 600;
-        border-radius: 12px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 8px 20px rgba(255, 107, 107, 0.3);
-        min-width: 200px;
-      }
-
-      .restart-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 25px rgba(255, 107, 107, 0.4);
-      }
-
-      .restart-btn:active {
-        transform: translateY(0);
-      }
-
-      .restart-btn:disabled {
-        background: #bdc3c7;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-      }
-
-      .countdown-container {
-        display: none;
-      }
-
-      .countdown-text {
-        font-size: 18px;
-        margin-bottom: 20px;
-        color: #2c3e50;
-      }
-
-      .countdown-number {
-        font-size: 48px;
-        font-weight: bold;
-        color: #e74c3c;
-        margin: 20px 0;
-        animation: pulse 1s infinite;
-      }
-
-      @keyframes pulse {
-        0% {
+      @keyframes pulse-scale {
+        0%,
+        100% {
           transform: scale(1);
         }
         50% {
           transform: scale(1.1);
         }
-        100% {
-          transform: scale(1);
-        }
       }
 
-      .loading {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 3px solid rgba(255, 255, 255, 0.3);
-        border-radius: 50%;
-        border-top-color: white;
-        animation: spin 1s ease-in-out infinite;
-        margin-right: 10px;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      .error-message {
-        background: #ffe6e6;
-        color: #c0392b;
-        padding: 15px;
-        border-radius: 8px;
-        margin-top: 20px;
-        border-left: 4px solid #e74c3c;
-        display: none;
-      }
-
-      .success-message {
-        background: #e8f5e8;
-        color: #27ae60;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        border-left: 4px solid #27ae60;
+      .animate-pulse-scale {
+        animation: pulse-scale 1s infinite;
       }
     </style>
   </head>
-  <body>
-    <div class="container">
+  <body
+    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-700"
+  >
+    <div class="bg-white rounded-3xl shadow-2xl p-12 text-center max-w-md w-11/12">
       <div id="initialState">
-        <h1 class="title">系统控制面板</h1>
-        <button id="restartBtn" class="restart-btn">
+        <h1 class="text-3xl font-semibold mb-8 text-gray-800">系统控制面板</h1>
+        <button
+          id="restartBtn"
+          class="bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold text-xl px-10 py-5 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none min-w-[200px]"
+        >
           <span id="btnText">重启系统</span>
         </button>
-        <div id="errorMessage" class="error-message"></div>
+        <div
+          id="errorMessage"
+          class="hidden mt-5 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg"
+        ></div>
       </div>
 
-      <div id="countdownState" class="countdown-container">
-        <div class="success-message">重启请求发送成功！</div>
-        <div class="countdown-text">系统将在以下时间后自动跳转：</div>
-        <div id="countdownNumber" class="countdown-number">5</div>
-        <div style="color: #7f8c8d; font-size: 14px">请稍等，正在准备跳转...</div>
+      <div id="countdownState" class="hidden">
+        <div class="bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded-lg mb-5">重启请求发送成功！</div>
+        <div class="text-lg mb-5 text-gray-800">系统将在以下时间后自动跳转：</div>
+        <div id="countdownNumber" class="text-6xl font-bold text-red-500 my-5 animate-pulse-scale">5</div>
+        <div class="text-gray-500 text-sm">请稍等，正在准备跳转...</div>
       </div>
     </div>
 
