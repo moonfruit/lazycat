@@ -19,7 +19,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Extract version
         id: extract
@@ -55,7 +55,7 @@ jobs:
             ghcr.io/${{ github.actor }}/aria2:latest
 
       - name: Generate attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-name: ghcr.io/${{ github.actor }}/aria2
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
