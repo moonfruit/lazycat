@@ -10,7 +10,7 @@ application:
   background_task: true
   multi_instance: true
   routes:
-    - /=http://vue
+    - /=http://vue/
 services:
   qbit:
     image: lscr.io/linuxserver/qbittorrent:5.1.2-r3-ls419

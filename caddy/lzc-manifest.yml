@@ -11,7 +11,7 @@ application:
   multi_instance: true
   upstreams:
     - location: /
-      backend: http://caddy
+      backend: http://caddy/
       use_backend_host: false
 services:
   caddy:

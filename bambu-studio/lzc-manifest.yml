@@ -10,7 +10,7 @@ application:
   gpu_accel: true
   upstreams:
     - location: /
-      backend: https://studio:3001
+      backend: https://studio:3001/
       disable_backend_ssl_verify: true
 services:
   studio:

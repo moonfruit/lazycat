@@ -11,7 +11,7 @@ application:
     - /
   upstreams:
     - location: /
-      backend: http://httpbin
+      backend: http://httpbin/
       use_backend_host: false
 services:
   httpbin:
