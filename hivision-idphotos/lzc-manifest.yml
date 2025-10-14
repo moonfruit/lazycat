@@ -1,0 +1,17 @@
+name: HivisionIDPhotos
+package: com.github.moonfruit.hivision-idphotos
+version: 1.3.1
+description: The open-source, cutting-edge, feature-rich slicing software for 3D printers.
+license: https://choosealicense.com/licenses/apache-2.0/
+homepage: https://github.com/Zeyi-Lin/HivisionIDPhotos
+author: MoonFruit
+application:
+  subdomain: hivision
+  routes:
+    - /=http://hivision:7860
+services:
+  hivision:
+    image: linzeyi/hivision_idphotos:v1.3.1
+  hivision_api:
+    image: linzeyi/hivision_idphotos:v1.3.1
+    command: python3 deploy_api.py

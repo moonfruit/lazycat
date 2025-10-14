@@ -9,8 +9,10 @@ application:
   subdomain: caddy
   background_task: true
   multi_instance: true
-  routes:
-    - /=http://caddy.com.github.moonfruit.caddy.lzcapp
+  upstreams:
+    - location: /
+      backend: http://caddy
+      use_backend_host: false
 services:
   caddy:
     image: caddy:2.10.2
