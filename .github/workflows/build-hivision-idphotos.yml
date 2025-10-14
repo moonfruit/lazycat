@@ -22,6 +22,9 @@ jobs:
         with:
           repository: Zeyi-Lin/HivisionIDPhotos
 
+      - name: Fix Dockerfile
+        run: sed -i 's/libgl1-mesa-glx/libgl1 libgl1-mesa-dri/' Dockerfile
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
