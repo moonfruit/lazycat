@@ -22,6 +22,15 @@ jobs:
         with:
           repository: Zeyi-Lin/HivisionIDPhotos
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+
+      - name: Install dependencies
+        run: pip install requests tqdm
+
+      - name: Download models
+        run: python scripts/download_model.py --models all
+
       - name: Fix Dockerfile
         run: sed -i 's/libgl1-mesa-glx/libgl1 libgl1-mesa-dri/' Dockerfile
 
