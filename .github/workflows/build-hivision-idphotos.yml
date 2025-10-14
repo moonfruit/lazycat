@@ -41,7 +41,6 @@ jobs:
         with:
           cache-from: type=gha,scope=hivision-idphotos
           cache-to: type=gha,scope=hivision-idphotos,mode=max
-          context: docker/hivision-idphotos
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ghcr.io/${{ github.actor }}/hivision-idphotos:latest
