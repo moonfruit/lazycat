@@ -8,7 +8,9 @@ author: MoonFruit
 application:
   subdomain: hivision
   routes:
-    - /=http://hivision:7860
+    - /api/=http://hivision_api:8080/
+    - /favicon.ico=file:///lzcapp/pkg/content/favicon.ico
+    - /=http://hivision:7860/
 services:
   hivision:
     image: linzeyi/hivision_idphotos:v1.3.1
