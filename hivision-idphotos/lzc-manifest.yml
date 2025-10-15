@@ -7,6 +7,8 @@ homepage: https://github.com/Zeyi-Lin/HivisionIDPhotos
 author: MoonFruit
 application:
   subdomain: hivision
+  public_path:
+    - /
   routes:
     - /api/=http://hivision_api:8080/
     - /favicon.ico=file:///lzcapp/pkg/content/favicon.ico
