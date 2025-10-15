@@ -1,0 +1,20 @@
+name: MyIP
+package: com.github.moonfruit.myip
+version: 5.0.6
+description: The best IP Toolbox
+license: https://choosealicense.com/licenses/mit/
+homepage: https://github.com/jason5ng32/MyIP
+author: MoonFruit
+application:
+  subdomain: myip
+  public_path:
+    - /
+  upstreams:
+    - location: /
+      backend: http://myip:18966/
+      use_backend_host: false
+services:
+  myip:
+    image: jason5ng32/myip:v5.0.6
+    environment:
+      - ALLOWED_DOMAINS=myip.${LAZYCAT_BOX_DOMAIN}
