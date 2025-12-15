@@ -1,0 +1,10 @@
+name: 弱电箱交换机
+package: com.github.moonfruit.switch1
+version: 1.0.0
+application:
+  subdomain: switch1
+  public_path:
+    - /
+  upstreams:
+    - location: /
+      backend: http://192.168.50.5/

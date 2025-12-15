@@ -1,0 +1,14 @@
+name: 算力舱
+package: com.github.moonfruit.aipod
+version: 1.0.0
+application:
+  subdomain: aipod
+  upstreams:
+    - location: /
+      backend_launch_command: /lzcapp/pkg/content/netmap -target=192.168.50.12 -port=33
+      backend: file:///lzcapp/pkg/content/web
+  ingress:
+    - protocol: tcp
+      port: 33
+      publish_port: 0-65535
+      send_port_info: true

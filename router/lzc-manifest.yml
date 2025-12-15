@@ -1,0 +1,16 @@
+name: 路由器
+package: com.github.moonfruit.router
+version: 1.0.0
+application:
+  subdomain: router
+  public_path:
+    - /
+  upstreams:
+    - location: /
+      backend_launch_command: /lzcapp/pkg/content/netmap -target=192.168.50.1 -port=33
+      backend: http://192.168.50.1/
+  ingress:
+    - protocol: tcp
+      port: 33
+      publish_port: 0-65535
+      send_port_info: true
