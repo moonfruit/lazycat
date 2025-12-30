@@ -6,8 +6,11 @@ application:
   upstreams:
     - location: /
       backend_launch_command: /lzcapp/pkg/content/netmap -target=192.168.50.12 -port=33
-      backend: file:///lzcapp/pkg/content/web
-      # backend: http://192.168.50.12/
+      # backend: file:///lzcapp/pkg/content/web
+      backend: http://192.168.50.12:8080/
+    - location: /
+      domain_prefix: dockge
+      backend: http://192.168.50.12:5001/
   ingress:
     - protocol: tcp
       port: 33
