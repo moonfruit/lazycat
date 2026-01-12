@@ -1,6 +1,6 @@
 all: app.lpk
 
-app.lpk: lzc-* go.* *.go
+app.lpk: lzc-* src/*
 	lzc-cli project build -o app.lpk
 
 clean:

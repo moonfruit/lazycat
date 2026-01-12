@@ -1,7 +1,7 @@
 # buildscript
 # - 可以为构建脚本的路径地址
 # - 如果构建命令简单，也可以直接写 sh 的命令
-buildscript: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/
+buildscript: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C src build -o ../dist/
 
 # manifest: 指定 lpk 包的 manifest.yml 文件路径
 manifest: ./lzc-manifest.yml

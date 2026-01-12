@@ -1,6 +1,6 @@
 all: app.lpk
 
-app.lpk: lzc-* ../router/go.* ../router/*.go src/*
+app.lpk: lzc-* ../router/src/* src/*
 	lzc-cli project build -o app.lpk
 
 clean:

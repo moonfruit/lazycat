@@ -16,7 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-//go:embed web.html lzc-icon.png
+//go:embed web.html icon.png
 var webContent embed.FS
 
 var (
@@ -161,13 +161,13 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 	logBus.mu.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"logs": history,
 	})
 }
 
 func handleFavicon(w http.ResponseWriter, _ *http.Request) {
-	content, err := webContent.ReadFile("lzc-icon.png")
+	content, err := webContent.ReadFile("icon.png")
 	if err != nil {
 		http.Error(w, "Favicon not found", http.StatusNotFound)
 		return

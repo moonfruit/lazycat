@@ -2,7 +2,7 @@
 # - 可以为构建脚本的路径地址
 # - 如果构建命令简单，也可以直接写 sh 的命令
 buildscript: |
-  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -C ../router -o ../aipod/dist/
+  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -C ../router/src -o ../../aipod/dist/
   cp -r src dist/web
 
 # manifest: 指定 lpk 包的 manifest.yml 文件路径
