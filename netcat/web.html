@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCP Server 日志监控</title>
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #252526;
+            padding: 15px 20px;
+            border-bottom: 1px solid #3c3c3c;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #cccccc;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ec9b0;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.disconnected {
+            background: #f48771;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            padding: 10px 20px;
+            background: #252526;
+            border-bottom: 1px solid #3c3c3c;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #1177bb;
+        }
+
+        button.danger {
+            background: #d16969;
+        }
+
+        button.danger:hover {
+            background: #e07474;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 5px;
+            margin-left: auto;
+        }
+
+        .filter-btn {
+            padding: 4px 10px;
+            font-size: 12px;
+            opacity: 0.6;
+        }
+
+        .filter-btn.active {
+            opacity: 1;
+            background: #0e639c;
+        }
+
+        .log-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 20px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            display: flex;
+            gap: 12px;
+            border-bottom: 1px solid #2d2d2d;
+        }
+
+        .log-entry:hover {
+            background: #2d2d30;
+        }
+
+        .log-timestamp {
+            color: #858585;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+
+        .log-level {
+            font-weight: bold;
+            width: 50px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .log-level.INFO {
+            color: #4ec9b0;
+        }
+
+        .log-level.ERROR {
+            color: #f48771;
+        }
+
+        .log-level.DATA {
+            color: #dcdcaa;
+        }
+
+        .log-level.WARN {
+            color: #ce9178;
+        }
+
+        .log-message {
+            flex: 1;
+            word-break: break-all;
+        }
+
+        .stats {
+            padding: 8px 20px;
+            background: #252526;
+            border-top: 1px solid #3c3c3c;
+            font-size: 12px;
+            color: #858585;
+            display: flex;
+            gap: 20px;
+        }
+
+        .stats span {
+            display: flex;
+            gap: 5px;
+        }
+
+        .stats strong {
+            color: #d4d4d4;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+
+        .auto-scroll {
+            margin-left: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            color: #cccccc;
+        }
+
+        .auto-scroll input[type="checkbox"] {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🖥️ TCP Server 日志监控</h1>
+        <div class="status">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <span id="statusText">连接中...</span>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button onclick="clearLogs()">清空日志</button>
+        <button onclick="exportLogs()" class="export">导出日志</button>
+        <div class="auto-scroll">
+            <input type="checkbox" id="autoScroll" checked>
+            <label for="autoScroll">自动滚动</label>
+        </div>
+        <div class="filter-group">
+            <button class="filter-btn active" data-level="ALL" onclick="filterLogs('ALL')">全部</button>
+            <button class="filter-btn" data-level="INFO" onclick="filterLogs('INFO')">INFO</button>
+            <button class="filter-btn" data-level="DATA" onclick="filterLogs('DATA')">DATA</button>
+            <button class="filter-btn" data-level="ERROR" onclick="filterLogs('ERROR')">ERROR</button>
+        </div>
+    </div>
+
+    <div class="log-container" id="logContainer"></div>
+
+    <div class="stats">
+        <span>总日志数: <strong id="totalLogs">0</strong></span>
+        <span>INFO: <strong id="infoCount">0</strong></span>
+        <span>DATA: <strong id="dataCount">0</strong></span>
+        <span>ERROR: <strong id="errorCount">0</strong></span>
+    </div>
+
+    <script>
+        let ws = null;
+        let logs = [];
+        let currentFilter = 'ALL';
+        let stats = { INFO: 0, DATA: 0, ERROR: 0, WARN: 0 };
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                updateStatus(true);
+                console.log('WebSocket connected');
+            };
+
+            ws.onmessage = (event) => {
+                const log = JSON.parse(event.data);
+                addLog(log);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                updateStatus(false);
+            };
+
+            ws.onclose = () => {
+                updateStatus(false);
+                console.log('WebSocket disconnected, reconnecting in 3s...');
+                setTimeout(connect, 3000);
+            };
+        }
+
+        function updateStatus(connected) {
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+
+            if (connected) {
+                indicator.classList.remove('disconnected');
+                text.textContent = '已连接';
+            } else {
+                indicator.classList.add('disconnected');
+                text.textContent = '未连接';
+            }
+        }
+
+        function addLog(log) {
+            logs.push(log);
+            stats[log.level] = (stats[log.level] || 0) + 1;
+            updateStats();
+
+            if (currentFilter === 'ALL' || currentFilter === log.level) {
+                renderLog(log);
+                autoScroll();
+            }
+        }
+
+        function renderLog(log) {
+            const container = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-timestamp">${log.timestamp}</span>
+                <span class="log-level ${log.level}">${log.level}</span>
+                <span class="log-message">${escapeHtml(log.message)}</span>
+            `;
+            container.appendChild(entry);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function autoScroll() {
+            const checkbox = document.getElementById('autoScroll');
+            if (checkbox.checked) {
+                const container = document.getElementById('logContainer');
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function clearLogs() {
+            if (confirm('确定要清空所有日志吗?')) {
+                logs = [];
+                stats = { INFO: 0, DATA: 0, ERROR: 0, WARN: 0 };
+                document.getElementById('logContainer').innerHTML = '';
+                updateStats();
+            }
+        }
+
+        function filterLogs(level) {
+            currentFilter = level;
+
+            // 更新按钮状态
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.level === level);
+            });
+
+            // 重新渲染日志
+            const container = document.getElementById('logContainer');
+            container.innerHTML = '';
+
+            logs.forEach(log => {
+                if (level === 'ALL' || log.level === level) {
+                    renderLog(log);
+                }
+            });
+
+            autoScroll();
+        }
+
+        function updateStats() {
+            document.getElementById('totalLogs').textContent = logs.length;
+            document.getElementById('infoCount').textContent = stats.INFO || 0;
+            document.getElementById('dataCount').textContent = stats.DATA || 0;
+            document.getElementById('errorCount').textContent = stats.ERROR || 0;
+        }
+
+        function exportLogs() {
+            const text = logs.map(log =>
+                `[${log.timestamp}] [${log.level}] ${log.message}`
+            ).join('\n');
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tcp-server-logs-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 初始化连接
+        connect();
+    </script>
+</body>
+</html>

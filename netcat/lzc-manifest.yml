@@ -1,0 +1,11 @@
+name: Netcat
+package: com.github.moonfruit.netcat
+version: 1.0.0
+application:
+  subdomain: netcat
+  public_path:
+    - /
+  upstreams:
+    - location: /
+      backend_launch_command: /lzcapp/pkg/content/netcat --port 6888
+      backend: http://127.0.0.1:8080/
