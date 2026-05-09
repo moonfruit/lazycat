@@ -1,0 +1,7 @@
+package: com.github.moonfruit.myip
+version: 5.0.6
+name: MyIP
+description: The best IP Toolbox
+author: MoonFruit
+license: https://choosealicense.com/licenses/mit/
+homepage: https://github.com/jason5ng32/MyIP

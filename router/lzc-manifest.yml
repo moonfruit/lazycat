@@ -1,6 +1,3 @@
-name: 路由器
-package: com.github.moonfruit.router
-version: 1.0.0
 application:
   subdomain: router
   public_path:
