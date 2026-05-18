@@ -1,0 +1,28 @@
+application:
+  subdomain: seq
+  upstreams:
+    - location: /
+      backend: http://seq/
+  ingress:
+    - protocol: tcp
+      port: 5341
+      publish_port: 5341
+      service: seq
+    - protocol: udp
+      port: 12201
+      publish_port: 12201
+      service: gelf
+services:
+  seq:
+    image: datalust/seq:2025.2.16202
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORD=password
+    binds:
+      - /lzcapp/var/data:/data
+  gelf:
+    image: datalust/seq-input-gelf:4.0.02323
+    depends_on:
+      - seq
+    environment:
+      - SEQ_ADDRESS=http://seq:5341

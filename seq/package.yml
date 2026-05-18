@@ -1,0 +1,7 @@
+package: com.github.moonfruit.seq
+version: 2025.2.16202
+name: Seq
+description: The self-hosted search, analysis, and alerting server built for modern structured log data.
+author: MoonFruit
+license: https://datalust.co/doc/eula-current.pdf
+homepage: https://datalust.co/seq
