@@ -6,7 +6,7 @@ application:
     - /=http://vue/
 services:
   qbit:
-    image: lscr.io/linuxserver/qbittorrent:5.2.0_v2.0.12-ls454
+    image: lscr.io/linuxserver/qbittorrent:5.2.0_v2.0.12-ls458
     environment:
       - PUID=0
       - PGID=0
@@ -19,7 +19,7 @@ services:
       - /lzcapp/var/qbittorrent:/config
       - /lzcapp/run/mnt/home:/home
   vue:
-    image: ghcr.io/vuetorrent/vuetorrent-backend:2.7.2
+    image: ghcr.io/vuetorrent/vuetorrent-backend:2.7.3
     depends_on:
       - qbit
     environment:

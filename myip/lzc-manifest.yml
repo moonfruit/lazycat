@@ -8,6 +8,6 @@ application:
       use_backend_host: false
 services:
   myip:
-    image: jason5ng32/myip:v6.1.0
+    image: jason5ng32/myip:v6.2.0
     environment:
       - ALLOWED_DOMAINS=myip.${LAZYCAT_BOX_DOMAIN}
