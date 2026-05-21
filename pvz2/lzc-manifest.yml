@@ -1,0 +1,10 @@
+application:
+  subdomain: pvz2
+  upstreams:
+    - location: /
+      backend: http://pvz2/
+  public_path:
+    - /
+services:
+  pvz2:
+    image: gaozih/pvzge:v0.8.2
