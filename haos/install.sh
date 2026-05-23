@@ -30,7 +30,7 @@ ip link show "$PARENT_IF" >/dev/null 2>&1 \
 # --- 1. apt packages --------------------------------------------------------
 apt-get update -qq
 apt-get install -y --no-install-recommends \
-  qemu-system-x86 ovmf qemu-utils socat curl xz-utils
+  qemu-system-x86 ovmf qemu-utils socat curl xz-utils arp-scan
 
 # --- 2. Directory layout ---------------------------------------------------
 install -d -m 0755 /opt/haos/bin
