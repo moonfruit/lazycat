@@ -79,11 +79,16 @@ BAK="/opt/haos/data/haos_ova-${VERSION}.qcow2.bak"
 if [[ ! -f "$IMG" ]]; then
   URL="https://github.com/home-assistant/operating-system/releases/download/${VERSION}/haos_ova-${VERSION}.qcow2.xz"
   echo "downloading $URL"
-  tmpxz=$(mktemp --suffix=.qcow2.xz)
-  trap 'rm -f "$tmpxz"' EXIT
+  # Write through temp files and rename atomically — a killed/failed download
+  # must not leave a truncated qcow2 at $IMG (which a future re-run would
+  # incorrectly treat as cached).
+  tmpxz=$(mktemp --suffix=.qcow2.xz -p /opt/haos/data)
+  imgtmp=$(mktemp --suffix=.qcow2 -p /opt/haos/data)
+  trap 'rm -f "$tmpxz" "$imgtmp"' EXIT
   curl -fL -o "$tmpxz" "$URL"
   echo "decompressing to $IMG"
-  xz -dc "$tmpxz" > "$IMG"
+  xz -dc "$tmpxz" > "$imgtmp"
+  mv "$imgtmp" "$IMG"
   cp -a "$IMG" "$BAK"
   rm -f "$tmpxz"
   trap - EXIT

@@ -116,8 +116,8 @@ end-to-end and HAOS is a first-class LAN citizen.
 ## Last verified deployment
 
 - **Date**: 2026-05-23
-- **Host**: lzcbox-052d6a70 (192.168.50.11), Debian 12, kernel 6.5
-- **LightOS instance**: `cloud.lazycat.lightos.entry--debian`, macvlan, 192.168.50.13
+- **Host OS**: Debian 12, kernel 6.5, machine lzcbox-052d6a70 at 192.168.50.11
+- **LightOS instance OS**: Debian 13 (trixie), instance `cloud.lazycat.lightos.entry--debian`, macvlan 192.168.50.13
 - **HAOS version**: 17.3
 - **HAOS MAC**: 52:54:00:c7:22:46 (auto-generated from md5(hostname))
 - **HAOS IP**: 192.168.50.216 (DHCP from LAN router)

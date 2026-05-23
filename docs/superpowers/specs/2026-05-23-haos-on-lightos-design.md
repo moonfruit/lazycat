@@ -79,8 +79,9 @@ mount（uid 1000 ↔ 容器 root），LightOS 内 root 写入会触发 EOVERFLOW
 
 1. HAOS 在 L2 上是独立设备 —— macvtap 让它带独立 MAC，路由器看到三台机器各占一个 DHCP 租约。
 2. systemd 是唯一的进程主管 —— `haos.service` 拉起 qemu；qemu 内部 HAOS 自治。
-3. 持久化数据在宿主目录 —— qcow2 + UEFI vars 落在 `/var/lib/haos/`，
-   通过 LightOS 的 `bind_mounts` 注入；重建 LightOS 不丢数据。
+3. 持久化数据在 LightOS rootfs 内 —— qcow2 + UEFI vars 落在 `/var/lib/haos/`
+   （= 宿主 btrfs subvol `/lzcsys/data/appvar/cloud.lazycat.lightos.entry/var/lib/haos`）。
+   service 重启不丢；LightOS 实例重建会丢，备份依赖宿主侧 `btrfs subvolume snapshot`。
 4. 没有 LazyCat 反代 —— HAOS 直接通过 `http://192.168.50.X:8123` 访问；不在 LazyCat 主屏出现。
 
 ### 已知 trade-off

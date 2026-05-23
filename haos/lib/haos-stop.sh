@@ -12,9 +12,11 @@ if [[ ! -S "$HAOS_QMP_SOCK" ]]; then
 fi
 
 # Two JSON messages on one connection. socat with - reads stdin and sends it.
+# -T5 caps how long this can hang if QMP is open-but-unresponsive — without it
+# we could block all the way up to systemd's TimeoutStopSec (90 s).
 printf '%s\n%s\n' \
   '{"execute":"qmp_capabilities"}' \
   '{"execute":"system_powerdown"}' \
-  | socat - "UNIX-CONNECT:$HAOS_QMP_SOCK" >/dev/null 2>&1 || true
+  | socat -T5 - "UNIX-CONNECT:$HAOS_QMP_SOCK" >/dev/null 2>&1 || true
 
 echo "haos-stop: powerdown sent"
