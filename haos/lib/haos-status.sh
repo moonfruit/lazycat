@@ -29,7 +29,9 @@ if [[ -S "$HAOS_QMP_SOCK" ]] && command -v socat >/dev/null; then
     '{"execute":"qmp_capabilities"}' \
     '{"execute":"query-status"}' \
     | socat -T2 - "UNIX-CONNECT:$HAOS_QMP_SOCK" 2>/dev/null | tr -d '\r')
-  guest=$(echo "$resp" | grep -oE '"status":"[^"]+"' | head -1 | cut -d'"' -f4)
+  # QMP serializes JSON with a space after the colon: `"status": "running"`,
+  # so allow optional whitespace before the value.
+  guest=$(echo "$resp" | sed -nE 's/.*"status":[[:space:]]*"([^"]+)".*/\1/p' | head -1)
   echo "2. guest status:  ${guest:-unknown}"
 elif (( EUID != 0 )); then
   echo "2. guest status:  $(yellow "needs sudo (qmp.sock under /run/haos is root-only)")"
