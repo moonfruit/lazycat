@@ -216,20 +216,25 @@ HAOS_QMP_SOCK=/run/haos/qmp.sock
 
 ### `haos-stop.sh`
 
-**契约**：无参数，从环境读 `HAOS_QMP_SOCK`，通过 QMP 向 guest 发优雅关机命令。
+**契约**：无参数，从环境读 `HAOS_QMP_SOCK`、`HAOS_SHUTDOWN_WAIT`（默认 60 秒）。
+通过 QMP 向 guest 发 ACPI 关机事件，**阻塞**等待 qemu 自然退出。
 
 **行为**：
 
 1. 检查 `$HAOS_QMP_SOCK` socket 存在；不存在则退出 0（qemu 没起也算"已停"）。
-2. 通过 socat 向 QMP 发送两条命令（先握手再 powerdown）：
+2. 通过 socat 发 `qmp_capabilities` + `system_powerdown` 两条 QMP 命令
+   （后者触发 qemu 给 guest 发 ACPI power button 事件）。socat 加 `-T5` 防止
+   socket 假死时阻塞。
+3. 从 `systemctl show -p MainPID --value haos.service` 拿到 qemu 主进程 PID。
+4. **轮询 `kill -0 $MAIN_PID` 直到该进程退出**（guest 完成 systemd shutdown
+   → unmount → ACPI poweroff → qemu exit）或者达到 `HAOS_SHUTDOWN_WAIT` 上限。
+5. 始终 `exit 0` —— 超时不算失败，让 systemd 接管 SIGTERM/SIGKILL 兜底。
 
-   ```
-   {"execute":"qmp_capabilities"}
-   {"execute":"system_powerdown"}
-   ```
-
-3. 退出 0；不等待 guest 实际关机，由 systemd 的 `TimeoutStopSec=90s` 控制等待时间，
-   超时则 systemd 用 `SIGTERM` 兜底（这正是 `KillMode=mixed` 的目的）。
+**为何必须阻塞**：systemd `ExecStop=` 命令一返回，systemd 就**立刻** SIGTERM
+主进程。`TimeoutStopSec=90s` 控制的是 **SIGTERM → SIGKILL** 的窗口，不是 ExecStop
+返回后的额外等待。如果 stop 脚本立即退出，guest 内核连接收 ACPI 事件的时间都没有，
+SQLite/文件系统会被强断电状态破坏。`HAOS_SHUTDOWN_WAIT` 必须小于 `TimeoutStopSec`
+以留出兜底窗口。
 
 **为何独立脚本而非内联 ExecStop**：systemd unit 的 `ExecStop=` 行不支持 bash herestring (`<<<`)
 和管道，会被字面量传给执行程序。独立脚本让逻辑可读、可单独测试。
