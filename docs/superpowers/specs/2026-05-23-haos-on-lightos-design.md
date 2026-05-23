@@ -1,8 +1,24 @@
 # HAOS on LightOS Debian 设计文档
 
 - **创建日期**：2026-05-23
-- **状态**：设计阶段（待用户最终评审）
+- **状态**：已落地（2026-05-23 验证：HAOS 17.3 在 192.168.50.216 跑通，LAN 可达）
 - **作用范围**：本仓库新增 `haos/` 子目录，部署到运行中的 LightOS debian 实例（192.168.50.13）
+
+## Amendments (2026-05-23 实施阶段)
+
+**持久化数据位置从 LazyCat 的 document 映射目录改到 `/var/lib/haos/`**：
+
+设计时计划把 qcow2/UEFI vars 放在 `/lzcapp/document/VM/haos/`（通过 LightOS bind_mount
+注入），优点是重建 LightOS 实例不丢数据。实施时发现这个 mount 是 LazyCat 的 idmapped
+mount（uid 1000 ↔ 容器 root），LightOS 内 root 写入会触发 EOVERFLOW。由于 `haos.service`
+必须以 root 跑（apt、systemd、macvtap 创建），数据只能落在 root 可写的位置。
+
+改用 LightOS rootfs 内 `/var/lib/haos/`（btrfs subvol），权限干净；代价是重建 LightOS
+实例时数据会丢，但宿主侧 `btrfs subvolume snapshot` 仍可备份（snapshot 路径在
+`/lzcsys/data/appvar/cloud.lazycat.lightos.entry/var/lib/haos/`）。
+
+下文正文与代码均已对齐到 `/var/lib/haos/`。下面 §已知 trade-off 表里"qcow2 在 document
+目录"那行也已经不再适用，但保留以记录原设计意图。
 
 ## 目标
 
@@ -63,7 +79,7 @@
 
 1. HAOS 在 L2 上是独立设备 —— macvtap 让它带独立 MAC，路由器看到三台机器各占一个 DHCP 租约。
 2. systemd 是唯一的进程主管 —— `haos.service` 拉起 qemu；qemu 内部 HAOS 自治。
-3. 持久化数据在宿主目录 —— qcow2 + UEFI vars 落在 `/lzcapp/document/VM/haos/`，
+3. 持久化数据在宿主目录 —— qcow2 + UEFI vars 落在 `/var/lib/haos/`，
    通过 LightOS 的 `bind_mounts` 注入；重建 LightOS 不丢数据。
 4. 没有 LazyCat 反代 —— HAOS 直接通过 `http://192.168.50.X:8123` 访问；不在 LazyCat 主屏出现。
 
@@ -108,7 +124,7 @@ haos/
 │   ├── haos-launch.sh
 │   ├── haos-stop.sh
 │   └── haos-status.sh
-└── data → /lzcapp/document/VM/haos/   # symlink 到持久化数据
+└── data → /var/lib/haos/   # symlink 到持久化数据
 
 /etc/systemd/system/haos.service       # 唯一不在 /opt/haos/ 下的文件
                                        # systemd 只从这条路径加载 unit，避不开
@@ -125,7 +141,7 @@ haos/
 ### 持久化数据物理位置
 
 ```
-/lzcapp/document/VM/haos/
+/var/lib/haos/
 ├── haos_ova.qcow2          # 主镜像（首次下载，之后 HAOS OTA 升级）
 ├── OVMF_VARS.fd            # UEFI 变量
 └── haos_ova-<ver>.qcow2.bak  # update.sh 拉的参考镜像（灾备）
@@ -245,7 +261,7 @@ RestartSec=10s
 
 ProtectSystem=strict
 # /opt/haos 整个写入（symlink 自身用）+ symlink 的真实 target + 运行时与日志
-ReadWritePaths=/opt/haos /lzcapp/document/VM/haos /run/haos /var/log/haos
+ReadWritePaths=/opt/haos /var/lib/haos /run/haos /var/log/haos
 
 [Install]
 WantedBy=multi-user.target
@@ -266,7 +282,7 @@ WantedBy=multi-user.target
 
 1. 环境自检：`/dev/kvm`、KVM 模块、父网卡、Debian 13。
 2. `apt update && apt install -y qemu-system-x86 ovmf qemu-utils socat`（已装跳过）。
-3. 建目录：`/opt/haos/bin`、`/var/log/haos`、`/lzcapp/document/VM/haos/`；建 `/opt/haos/data → /lzcapp/document/VM/haos/` symlink。
+3. 建目录：`/opt/haos/bin`、`/var/log/haos`、`/var/lib/haos/`；建 `/opt/haos/data → /var/lib/haos/` symlink。
 4. 拷贝 `lib/haos-{network,launch,stop,status}.sh` → `/opt/haos/bin/`，`chmod +x`。
 5. `/opt/haos/haos.conf` 不存在 → 从 `lib/haos.conf.example` 拷贝，并替换 `HAOS_MAC` 占位为
    基于 `hostname` 计算的稳定 MAC（`52:54:00` + md5(hostname) 前 6 hex）；

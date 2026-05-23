@@ -1,5 +1,12 @@
 # HAOS on LightOS Implementation Plan
 
+> **Status (2026-05-23):** Executed and verified. HAOS 17.3 running on 192.168.50.216,
+> LAN-reachable. One deviation from this plan: persistent data path was moved from
+> `/lzcapp/document/VM/haos/` to `/var/lib/haos/` during Task 12 (the document mount
+> is idmapped and unwritable by root). See the spec's Amendments section for details.
+> The references to `/lzcapp/document/VM/haos/` below are preserved as the ex-ante
+> plan; the shipped code uses `/var/lib/haos/`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a `haos/` subdirectory in the lazycat repo containing all scripts and config templates needed to deploy a Home Assistant OS (HAOS) virtual machine inside the existing LightOS debian instance at 192.168.50.13, giving HAOS a fully LAN-visible identity (independent MAC + DHCP IP) so all smart-home discovery protocols (mDNS / SSDP / HomeKit) work natively.
