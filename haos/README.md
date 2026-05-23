@@ -123,5 +123,6 @@ end-to-end and HAOS is a first-class LAN citizen.
 - **LightOS instance OS**: Debian 13 (trixie), instance `cloud.lazycat.lightos.entry--debian`, macvlan 192.168.50.13
 - **HAOS version**: 17.3
 - **HAOS MAC**: 52:54:00:c7:22:46 (auto-generated from md5(hostname))
-- **HAOS IP**: 192.168.50.216 (DHCP from LAN router)
-- **Verified**: ping 1.8 ms, HTTP 200 on :8123 from another LAN host
+- **HAOS IP**: 192.168.50.15 (DHCP — for stable IP, bind HAOS_MAC on your router)
+- **Verified**: HTTP 200 on :8123 from another LAN host; `haos-status.sh` all-green
+  (service active, guest running, tap UP, arp-scan finds HAOS, :8123 reachable)
