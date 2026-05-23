@@ -87,15 +87,18 @@ from this LightOS instance (e.g. for backups or shared media), run on LightOS:
 sudo ~/haos/setup-nfs.sh
 ```
 
-The script installs `nfs-kernel-server`, creates `/srv/haos`, exports it to
-`192.168.50.0/24` (NFSv4, rw, no_root_squash), and enables the systemd unit.
+The script installs `nfs-kernel-server`, creates `/opt/haos/share`,
+exports it to `192.168.50.0/24` (NFSv4, rw, no_root_squash), and enables
+the systemd unit.
 
 Then in HAOS Web UI: **Settings → System → Storage → Add Network Storage**
-(pick NFS, point at `<lightos-ip>:/srv/haos`).
+(pick NFS, point at `<lightos-ip>:/opt/haos/share`).
 
-**Caveat**: `/srv/haos` lives in the LightOS rootfs btrfs subvol — survives
-service restarts but not LightOS instance rebuild. Snapshot via the host-side
-`btrfs subvolume snapshot` if you need durability across rebuilds.
+**Why /opt/haos/share** (not under /lzcapp/document/): `/lzcapp/document/`
+is an idmapped bind-mount and the Linux kernel's in-kernel nfsd refuses to
+export idmapped mounts. /opt/haos/share lives in the LightOS rootfs btrfs
+subvol — survives service restarts, but rebuilding the LightOS instance
+drops it. Back up via host-side `btrfs subvolume snapshot` if needed.
 
 ## Lifecycle
 
