@@ -1,0 +1,31 @@
+[Unit]
+Description=Home Assistant OS (KVM nested in LightOS)
+Documentation=https://www.home-assistant.io/installation/linux
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=exec
+EnvironmentFile=/opt/haos/haos.conf
+RuntimeDirectory=haos
+RuntimeDirectoryMode=0750
+
+ExecStartPre=/opt/haos/bin/haos-network.sh up
+ExecStart=/opt/haos/bin/haos-launch.sh
+ExecStop=/opt/haos/bin/haos-stop.sh
+ExecStopPost=/opt/haos/bin/haos-network.sh down
+
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=90s
+
+Restart=on-failure
+RestartSec=10s
+
+ProtectSystem=strict
+# /opt/haos contains the data symlink, /lzcapp/document/VM/haos is its real target,
+# /run/haos is RuntimeDirectory, /var/log/haos receives install logs.
+ReadWritePaths=/opt/haos /lzcapp/document/VM/haos /run/haos /var/log/haos
+
+[Install]
+WantedBy=multi-user.target
