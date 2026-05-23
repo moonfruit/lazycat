@@ -3,10 +3,8 @@
 # Per the repo convention, sources user shell helpers from $ENV/lib/bash.
 set -euo pipefail
 
-# Hop through proxy if available (used by other update.sh in this repo)
-if [[ -z "${IN_PROXY:-}" ]] && command -v proxy >/dev/null 2>&1; then
-  export IN_PROXY=1
-  exec proxy "$0" "$@"
+if [[ -z "${PROXY_ENABLED:-}" ]] && hash proxy 2>/dev/null; then
+    exec proxy "$0" "$@"
 fi
 
 cd "$(dirname "$0")"
