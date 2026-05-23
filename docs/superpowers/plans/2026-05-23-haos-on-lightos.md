@@ -1,11 +1,10 @@
 # HAOS on LightOS Implementation Plan
 
 > **Status (2026-05-23):** Executed and verified. HAOS 17.3 running on 192.168.50.216,
-> LAN-reachable. One deviation from this plan: persistent data path was moved from
-> `/lzcapp/document/VM/haos/` to `/var/lib/haos/` during Task 12 (the document mount
-> is idmapped and unwritable by root). See the spec's Amendments section for details.
-> The references to `/lzcapp/document/VM/haos/` below are preserved as the ex-ante
-> plan; the shipped code uses `/var/lib/haos/`.
+> LAN-reachable. Several deviations from this ex-ante plan (path layout, install
+> transport, graceful stop semantics) — see the spec's Amendments section for the
+> final state. The plan text below is preserved as the original schedule of work;
+> consult the spec for what was actually shipped.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

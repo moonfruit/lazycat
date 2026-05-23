@@ -28,20 +28,17 @@ systemctl daemon-reload
 # Remove scripts
 rm -rf /opt/haos/bin
 
-# Always remove the data symlink (it's just a pointer)
-rm -f /opt/haos/data
-
 case "$MODE" in
   keep)
-    echo "kept /opt/haos/haos.conf and /var/lib/haos/"
+    echo "kept /opt/haos/haos.conf and /opt/haos/data/"
     ;;
   purge-uefi)
-    rm -f /var/lib/haos/OVMF_VARS.fd
+    rm -f /opt/haos/data/OVMF_VARS.fd
     echo "removed UEFI vars; kept qcow2 and config"
     ;;
   purge)
     rm -f /opt/haos/haos.conf
-    rm -rf /var/lib/haos
+    rm -rf /opt/haos/data
     rmdir /opt/haos 2>/dev/null || true
     echo "purged everything"
     ;;

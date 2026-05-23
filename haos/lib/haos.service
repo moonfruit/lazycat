@@ -23,9 +23,9 @@ Restart=on-failure
 RestartSec=10s
 
 ProtectSystem=strict
-# /opt/haos contains the data symlink, /var/lib/haos is its real target,
-# /run/haos is RuntimeDirectory, /var/log/haos receives install logs.
-ReadWritePaths=/opt/haos /var/lib/haos /run/haos /var/log/haos
+# /opt/haos holds runtime config, scripts, and qcow2/UEFI data (under data/).
+# /run/haos is the RuntimeDirectory.
+ReadWritePaths=/opt/haos /run/haos
 
 [Install]
 WantedBy=multi-user.target

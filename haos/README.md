@@ -21,21 +21,25 @@ manually via `install.sh` running on the target LightOS instance.
 
 ## Deploy
 
-From this directory on your dev machine:
+LazyCat exposes each LightOS instance via mDNS at `<instance-name>.<owner>.heiyu.space`
+(the懒猫 NSS shim resolves these — `ping` may not see them but `ssh` does).
+Sync the haos/ tree to the instance and run installer as moon via sudo:
 
 ```sh
-rsync -a --delete ./ root@<lightos-ip>:/root/haos/
-ssh root@<lightos-ip> 'cd /root/haos && ./install.sh'
-ssh root@<lightos-ip> 'systemctl start haos.service'
+# From this directory on your dev machine:
+rsync -a --delete ./ moon@<instance>.<owner>.heiyu.space:~/haos/
+
+# Then on the LightOS instance:
+ssh moon@<instance>.<owner>.heiyu.space
+sudo ~/haos/install.sh
+sudo systemctl start haos.service
 ```
 
-If your LightOS instance does not expose root SSH directly, run install.sh
-via host nsenter:
+Example for the canonical setup in this repo:
 
 ```sh
-ssh <host-ip> 'DPID=$(runc --root /lzcsys/run/lightos/.runc \
-  state cloud.lazycat.lightos.entry--debian | jq -r .pid); \
-  nsenter -t $DPID -m -n -u -i -p bash -c "cd /root/haos && ./install.sh"'
+rsync -a --delete ./ moon@debian.dkmooncat.heiyu.space:~/haos/
+ssh moon@debian.dkmooncat.heiyu.space 'sudo ~/haos/install.sh && sudo systemctl start haos.service'
 ```
 
 `install.sh` is idempotent — safe to re-run.
@@ -94,10 +98,9 @@ end-to-end and HAOS is a first-class LAN citizen.
 | `/etc/systemd/system/haos.service` | systemd unit |
 | `/opt/haos/haos.conf` | runtime config |
 | `/opt/haos/bin/` | the four lifecycle scripts |
-| `/opt/haos/data/` (symlink) | persistent qcow2 + UEFI vars |
-| `/var/lib/haos/` | symlink target — qcow2 lives here (in the LightOS rootfs btrfs subvol) |
+| `/opt/haos/data/` | persistent qcow2 + UEFI vars (real directory) |
+| `/opt/haos/log/install-*.log` | install transcripts |
 | `/run/haos/` | qmp.sock, monitor.sock, serial.sock, tap.ifindex |
-| `/var/log/haos/install-*.log` | install transcript |
 
 ## Troubleshooting
 

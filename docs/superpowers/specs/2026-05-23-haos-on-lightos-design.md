@@ -6,19 +6,31 @@
 
 ## Amendments (2026-05-23 实施阶段)
 
-**持久化数据位置从 LazyCat 的 document 映射目录改到 `/var/lib/haos/`**：
+实施过程中对设计做了几处调整，最终形态：
 
-设计时计划把 qcow2/UEFI vars 放在 `/lzcapp/document/VM/haos/`（通过 LightOS bind_mount
-注入），优点是重建 LightOS 实例不丢数据。实施时发现这个 mount 是 LazyCat 的 idmapped
-mount（uid 1000 ↔ 容器 root），LightOS 内 root 写入会触发 EOVERFLOW。由于 `haos.service`
-必须以 root 跑（apt、systemd、macvtap 创建），数据只能落在 root 可写的位置。
+1. **持久化数据位置**：spec 原定放在 `/lzcapp/document/VM/haos/`（LightOS bind_mount 注入），
+   但该路径是 LazyCat 的 idmapped mount（uid 1000 ↔ 容器 root），LightOS 内 root
+   写入触发 EOVERFLOW。`haos.service` 必须以 root 跑（apt、systemd、macvtap），数据只能
+   落在 root 可写的位置。**最终方案：所有持久状态集中在 `/opt/haos/`**：
+   - `/opt/haos/data/`（qcow2 + UEFI vars。中间方案曾用 symlink `/opt/haos/data → /var/lib/haos`，
+     最终简化为真目录）
+   - `/opt/haos/log/`（install 日志。原计划 `/var/log/haos`）
+   - `/opt/haos/bin/`、`/opt/haos/haos.conf`（这部分跟原 spec 一致）
 
-改用 LightOS rootfs 内 `/var/lib/haos/`（btrfs subvol），权限干净；代价是重建 LightOS
-实例时数据会丢，但宿主侧 `btrfs subvolume snapshot` 仍可备份（snapshot 路径在
-`/lzcsys/data/appvar/cloud.lazycat.lightos.entry/var/lib/haos/`）。
+   全部位于 LightOS rootfs btrfs subvol，service 重启不丢；实例重建会丢，备份依赖宿主侧
+   `btrfs subvolume snapshot /lzcsys/data/appvar/cloud.lazycat.lightos.entry/opt/haos/data`。
 
-下文正文与代码均已对齐到 `/var/lib/haos/`。下面 §已知 trade-off 表里"qcow2 在 document
-目录"那行也已经不再适用，但保留以记录原设计意图。
+2. **部署 transport**：原 README 示例假设 `ssh root@<lightos-ip>` 或宿主 nsenter 中转，
+   两者在实际 LazyCat 环境下都不可行。最终方案：通过懒猫 mDNS 域名
+   `ssh moon@<instance>.<owner>.heiyu.space`，安装脚本放 `~moon/haos/`，由用户
+   手动 `sudo ./install.sh`。无 root SSH、无宿主中转。
+
+3. **graceful stop 实际语义**：`haos-stop.sh` 原设计"立即返回，由 TimeoutStopSec 等"是错的——
+   systemd `ExecStop=` 一返回立刻 SIGTERM 主进程。最终改为**阻塞**等 qemu 进程退出
+   （`HAOS_SHUTDOWN_WAIT=60s` 上限，留 30s 给 systemd SIGTERM/SIGKILL 兜底）。
+
+下文正文与代码均已对齐到这些最终形态；§已知 trade-off 表里"qcow2 在 document 目录"那行
+已经不再适用，保留以记录原设计意图。
 
 ## 目标
 
@@ -79,8 +91,8 @@ mount（uid 1000 ↔ 容器 root），LightOS 内 root 写入会触发 EOVERFLOW
 
 1. HAOS 在 L2 上是独立设备 —— macvtap 让它带独立 MAC，路由器看到三台机器各占一个 DHCP 租约。
 2. systemd 是唯一的进程主管 —— `haos.service` 拉起 qemu；qemu 内部 HAOS 自治。
-3. 持久化数据在 LightOS rootfs 内 —— qcow2 + UEFI vars 落在 `/var/lib/haos/`
-   （= 宿主 btrfs subvol `/lzcsys/data/appvar/cloud.lazycat.lightos.entry/var/lib/haos`）。
+3. 持久化数据在 LightOS rootfs 内 —— qcow2 + UEFI vars 落在 `/opt/haos/data/`
+   （= 宿主 btrfs subvol `/lzcsys/data/appvar/cloud.lazycat.lightos.entry/opt/haos/data`）。
    service 重启不丢；LightOS 实例重建会丢，备份依赖宿主侧 `btrfs subvolume snapshot`。
 4. 没有 LazyCat 反代 —— HAOS 直接通过 `http://192.168.50.X:8123` 访问；不在 LazyCat 主屏出现。
 
@@ -125,7 +137,8 @@ haos/
 │   ├── haos-launch.sh
 │   ├── haos-stop.sh
 │   └── haos-status.sh
-└── data → /var/lib/haos/   # symlink 到持久化数据
+├── data/               # 持久化数据（qcow2、UEFI vars）
+└── log/                # install 日志
 
 /etc/systemd/system/haos.service       # 唯一不在 /opt/haos/ 下的文件
                                        # systemd 只从这条路径加载 unit，避不开
@@ -137,12 +150,13 @@ haos/
 |---|---|---|
 | `haos.conf` | 用户可改的配置 | 首次安装从 `lib/haos.conf.example` 拷贝；后续保留不覆盖 |
 | `bin/` | 受版本管理的逻辑脚本 | 每次 install 都覆盖 |
-| `data` | 持久化数据（软链） | install 时建 symlink，目标目录不存在则创建 |
+| `data/` | 持久化数据（qcow2 + OVMF_VARS） | install 时创建空目录；qcow2 由 install 下载，UEFI vars 拷贝自 `/usr/share/OVMF` |
+| `log/` | install 日志 | install 每次追加；卸载不动 |
 
 ### 持久化数据物理位置
 
 ```
-/var/lib/haos/
+/opt/haos/data/
 ├── haos_ova.qcow2          # 主镜像（首次下载，之后 HAOS OTA 升级）
 ├── OVMF_VARS.fd            # UEFI 变量
 └── haos_ova-<ver>.qcow2.bak  # update.sh 拉的参考镜像（灾备）
@@ -266,8 +280,8 @@ Restart=on-failure
 RestartSec=10s
 
 ProtectSystem=strict
-# /opt/haos 整个写入（symlink 自身用）+ symlink 的真实 target + 运行时与日志
-ReadWritePaths=/opt/haos /var/lib/haos /run/haos /var/log/haos
+# /opt/haos 整个写入（data/、log/ 都在其下） + 运行时 /run/haos
+ReadWritePaths=/opt/haos /run/haos
 
 [Install]
 WantedBy=multi-user.target
@@ -288,7 +302,7 @@ WantedBy=multi-user.target
 
 1. 环境自检：`/dev/kvm`、KVM 模块、父网卡、Debian 13。
 2. `apt update && apt install -y qemu-system-x86 ovmf qemu-utils socat`（已装跳过）。
-3. 建目录：`/opt/haos/bin`、`/var/log/haos`、`/var/lib/haos/`；建 `/opt/haos/data → /var/lib/haos/` symlink。
+3. 建目录：`/opt/haos/bin`、`/opt/haos/log`、`/opt/haos/data`（全部真目录，无 symlink）。
 4. 拷贝 `lib/haos-{network,launch,stop,status}.sh` → `/opt/haos/bin/`，`chmod +x`。
 5. `/opt/haos/haos.conf` 不存在 → 从 `lib/haos.conf.example` 拷贝，并替换 `HAOS_MAC` 占位为
    基于 `hostname` 计算的稳定 MAC（`52:54:00` + md5(hostname) 前 6 hex）；
@@ -302,8 +316,8 @@ WantedBy=multi-user.target
 
 ### `uninstall.sh`
 
-`systemctl disable --now haos.service` → 删 unit + `/opt/haos/bin/` + symlink。
-`/opt/haos/haos.conf` 和 `data/` 默认保留。可选标志：
+`systemctl disable --now haos.service` → 删 unit + `/opt/haos/bin/`。
+`/opt/haos/haos.conf` 和 `/opt/haos/data/` 默认保留。可选标志：
 
 - `--purge`：连同 `haos.conf` 和整个 `data/`（qcow2 + UEFI vars）一起删，回到全新状态。
 - `--purge-uefi-only`：仅删 `data/OVMF_VARS.fd`，下次启动让 HAOS 自动重建 UEFI 变量。
@@ -343,7 +357,7 @@ WantedBy=multi-user.target
 | qemu stdout/stderr | journald | 同上 |
 | HAOS guest 控制台 | `/run/haos/serial.sock` | `socat - UNIX-CONNECT:/run/haos/serial.sock` |
 | HAOS guest 内部 log | guest 内 journalctl | SSH 进 HAOS 或 Web 终端 |
-| install.sh | stdout + `/var/log/haos/install-<ts>.log` | 同时写 |
+| install.sh | stdout + `/opt/haos/log/install-<ts>.log` | 同时写 |
 
 不引入第三方监控。
 

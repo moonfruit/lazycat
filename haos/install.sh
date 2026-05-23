@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 LIB_DIR="$SCRIPT_DIR/lib"
-LOG_DIR=/var/log/haos
+LOG_DIR=/opt/haos/log
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee -a "$LOG") 2>&1
@@ -34,14 +34,11 @@ apt-get install -y --no-install-recommends \
 
 # --- 2. Directory layout ---------------------------------------------------
 install -d -m 0755 /opt/haos/bin
-install -d -m 0755 /var/lib/haos
-# symlink /opt/haos/data → persistent target.
-# NOTE: data lives in the LightOS rootfs btrfs subvol — survives LightOS service
-# restarts but not instance rebuild. /lzcapp/document/ would survive rebuild
-# too, but it's an idmapped mount and root inside LightOS can't write to it.
-if [[ ! -L /opt/haos/data ]]; then
-  ln -sfn /var/lib/haos /opt/haos/data
-fi
+install -d -m 0755 /opt/haos/data
+# Persistent data (qcow2, OVMF vars) lives directly in /opt/haos/data.
+# This is in the LightOS rootfs btrfs subvol — survives service restarts but
+# not LightOS instance rebuild. Back up by snapshotting the host-side subvol
+# at /lzcsys/data/appvar/cloud.lazycat.lightos.entry/opt/haos/data.
 
 # --- 3. Scripts ------------------------------------------------------------
 install -m 0755 "$LIB_DIR/haos-network.sh" /opt/haos/bin/
