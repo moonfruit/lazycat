@@ -54,12 +54,12 @@ fi
 #    LightOS has actually exchanged packets with HAOS).
 #    Fallback (root only): arp-scan refreshes the cache by broadcasting ARP
 #    requests across the parent interface's subnet.
+parent="${HAOS_PARENT_IF:-lzc-debian}"
 ip_addr=""
 if [[ -n "$HAOS_MAC" ]]; then
   mac_lc=$(echo "$HAOS_MAC" | tr '[:upper:]' '[:lower:]')
   ip_addr=$(ip neigh 2>/dev/null | awk -v m="$mac_lc" 'tolower($5)==m {print $1; exit}')
   if [[ -z "$ip_addr" ]] && (( EUID == 0 )) && command -v arp-scan >/dev/null; then
-    parent="${HAOS_PARENT_IF:-lzc-debian}"
     ip_addr=$(arp-scan -q -I "$parent" -l 2>/dev/null \
       | awk -v m="$mac_lc" 'tolower($2)==m {print $1; exit}')
   fi
