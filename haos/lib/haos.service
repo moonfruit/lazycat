@@ -23,9 +23,9 @@ Restart=on-failure
 RestartSec=10s
 
 ProtectSystem=strict
-# /opt/haos contains the data symlink, /lzcapp/document/VM/haos is its real target,
+# /opt/haos contains the data symlink, /var/lib/haos is its real target,
 # /run/haos is RuntimeDirectory, /var/log/haos receives install logs.
-ReadWritePaths=/opt/haos /lzcapp/document/VM/haos /run/haos /var/log/haos
+ReadWritePaths=/opt/haos /var/lib/haos /run/haos /var/log/haos
 
 [Install]
 WantedBy=multi-user.target

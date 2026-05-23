@@ -95,7 +95,7 @@ end-to-end and HAOS is a first-class LAN citizen.
 | `/opt/haos/haos.conf` | runtime config |
 | `/opt/haos/bin/` | the four lifecycle scripts |
 | `/opt/haos/data/` (symlink) | persistent qcow2 + UEFI vars |
-| `/lzcapp/document/VM/haos/` | symlink target on the LightOS host bind-mount |
+| `/var/lib/haos/` | symlink target — qcow2 lives here (in the LightOS rootfs btrfs subvol) |
 | `/run/haos/` | qmp.sock, monitor.sock, serial.sock, tap.ifindex |
 | `/var/log/haos/install-*.log` | install transcript |
 

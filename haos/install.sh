@@ -34,10 +34,13 @@ apt-get install -y --no-install-recommends \
 
 # --- 2. Directory layout ---------------------------------------------------
 install -d -m 0755 /opt/haos/bin
-install -d -m 0755 /lzcapp/document/VM/haos
-# symlink /opt/haos/data → persistent target
+install -d -m 0755 /var/lib/haos
+# symlink /opt/haos/data → persistent target.
+# NOTE: data lives in the LightOS rootfs btrfs subvol — survives LightOS service
+# restarts but not instance rebuild. /lzcapp/document/ would survive rebuild
+# too, but it's an idmapped mount and root inside LightOS can't write to it.
 if [[ ! -L /opt/haos/data ]]; then
-  ln -sfn /lzcapp/document/VM/haos /opt/haos/data
+  ln -sfn /var/lib/haos /opt/haos/data
 fi
 
 # --- 3. Scripts ------------------------------------------------------------

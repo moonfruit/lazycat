@@ -33,15 +33,15 @@ rm -f /opt/haos/data
 
 case "$MODE" in
   keep)
-    echo "kept /opt/haos/haos.conf and /lzcapp/document/VM/haos/"
+    echo "kept /opt/haos/haos.conf and /var/lib/haos/"
     ;;
   purge-uefi)
-    rm -f /lzcapp/document/VM/haos/OVMF_VARS.fd
+    rm -f /var/lib/haos/OVMF_VARS.fd
     echo "removed UEFI vars; kept qcow2 and config"
     ;;
   purge)
     rm -f /opt/haos/haos.conf
-    rm -rf /lzcapp/document/VM/haos
+    rm -rf /var/lib/haos
     rmdir /opt/haos 2>/dev/null || true
     echo "purged everything"
     ;;
