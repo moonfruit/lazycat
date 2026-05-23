@@ -21,7 +21,9 @@ case "$state" in
   *)        echo "1. service:       $(red "$state")" ;;
 esac
 
-# 2. QMP guest status
+# 2. QMP guest status — /run/haos is 0750 root:root (systemd RuntimeDirectory),
+#    so non-root users cannot even stat the socket. Detect that explicitly so
+#    the message is actionable.
 if [[ -S "$HAOS_QMP_SOCK" ]] && command -v socat >/dev/null; then
   resp=$(printf '%s\n%s\n' \
     '{"execute":"qmp_capabilities"}' \
@@ -29,8 +31,12 @@ if [[ -S "$HAOS_QMP_SOCK" ]] && command -v socat >/dev/null; then
     | socat -T2 - "UNIX-CONNECT:$HAOS_QMP_SOCK" 2>/dev/null | tr -d '\r')
   guest=$(echo "$resp" | grep -oE '"status":"[^"]+"' | head -1 | cut -d'"' -f4)
   echo "2. guest status:  ${guest:-unknown}"
+elif (( EUID != 0 )); then
+  echo "2. guest status:  $(yellow "needs sudo (qmp.sock under /run/haos is root-only)")"
+elif ! command -v socat >/dev/null; then
+  echo "2. guest status:  $(red "socat not installed")"
 else
-  echo "2. guest status:  $(yellow "QMP socket unavailable")"
+  echo "2. guest status:  $(yellow "QMP socket not present (service stopped?)")"
 fi
 
 # 3. tap interface
