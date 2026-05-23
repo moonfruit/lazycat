@@ -1,0 +1,25 @@
+# Home Assistant OS — runtime configuration
+# Loaded by systemd EnvironmentFile=. Lines are KEY=VALUE.
+# Comments start with '#'. No bash expansion is performed by systemd.
+
+# --- Image and firmware paths ---
+HAOS_IMAGE_PATH=/opt/haos/data/haos_ova.qcow2
+HAOS_OVMF_VARS=/opt/haos/data/OVMF_VARS.fd
+
+# --- Resources ---
+HAOS_RAM_MB=4096
+HAOS_VCPUS=2
+
+# --- Networking ---
+# Parent network interface in the LightOS container view.
+# When LightOS is running in macvlan mode, this is the lzc-<instance-name> interface.
+HAOS_PARENT_IF=lzc-debian
+HAOS_TAP_IF=haos-mvtap0
+
+# Stable MAC for HAOS. install.sh replaces the @AUTOGEN@ placeholder
+# with a deterministic value derived from MD5(hostname). KVM-reserved prefix 52:54:00.
+# You may overwrite manually after install if needed.
+HAOS_MAC=@AUTOGEN@
+
+# --- Management sockets (under systemd RuntimeDirectory) ---
+HAOS_QMP_SOCK=/run/haos/qmp.sock
