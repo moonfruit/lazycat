@@ -78,6 +78,25 @@ avahi-browse -art | grep -i home-assistant           # mDNS announces
 mDNS visibility is the cardinal test — it proves the macvtap path works
 end-to-end and HAOS is a first-class LAN citizen.
 
+## Optional: share a directory to HAOS via NFS
+
+HAOS 13+ has built-in network storage support. To let HAOS mount a directory
+from this LightOS instance (e.g. for backups or shared media), run on LightOS:
+
+```sh
+sudo ~/haos/setup-nfs.sh
+```
+
+The script installs `nfs-kernel-server`, creates `/srv/haos`, exports it to
+`192.168.50.0/24` (NFSv4, rw, no_root_squash), and enables the systemd unit.
+
+Then in HAOS Web UI: **Settings → System → Storage → Add Network Storage**
+(pick NFS, point at `<lightos-ip>:/srv/haos`).
+
+**Caveat**: `/srv/haos` lives in the LightOS rootfs btrfs subvol — survives
+service restarts but not LightOS instance rebuild. Snapshot via the host-side
+`btrfs subvolume snapshot` if you need durability across rebuilds.
+
 ## Lifecycle
 
 - **Update**: HAOS updates itself via Settings → System → Updates.
