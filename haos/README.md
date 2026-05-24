@@ -78,6 +78,43 @@ avahi-browse -art | grep -i home-assistant           # mDNS announces
 mDNS visibility is the cardinal test — it proves the macvtap path works
 end-to-end and HAOS is a first-class LAN citizen.
 
+## Optional: expose HAOS via the Lazycat hostname
+
+Without any extra setup HAOS lives on `http://<HAOS LAN IP>:8123`, which means
+your phone/laptop must be on the same LAN to reach it. If this LightOS instance
+is registered in the Lazycat network and reachable as
+`<instance>.<owner>.heiyu.space`, you can route HAOS through it:
+
+```sh
+sudo ~/haos/setup-proxy.sh
+```
+
+The script installs `nginx-light` and writes a single proxy site on `:80`
+forwarding to HAOS (auto-discovered from `haos.conf` + ARP, override via
+`HAOS_PROXY_UPSTREAM=<ip>`). WebSocket upgrade is enabled — HA's live UI works.
+
+Then in any browser **inside the Lazycat network** (the laptop also needs
+hclient-cli running):
+
+```
+https://<instance>.<owner>.heiyu.space/
+```
+
+The Lazycat platform gateway intercepts that hostname, requires a login to
+your Lazycat account, then transparently forwards the request to this
+LightOS instance's port 80 — where nginx reverse-proxies to HAOS:8123.
+
+**Caveats**:
+
+- The default nginx config does **not** send `X-Forwarded-*` headers — HA
+  rejects them unless the proxy IP is listed in `http.trusted_proxies`. HA
+  will see every request as coming from this LightOS's LAN IP. To get the
+  real client IP visible inside HA, configure trusted_proxies in HA's
+  `/config/configuration.yaml`, then uncomment the X-Forwarded-* lines in
+  `/etc/nginx/conf.d/haos-proxy.conf` and `systemctl reload nginx`.
+- The hostname path goes through the Lazycat account-login gateway. Direct
+  LAN access via `http://<HAOS LAN IP>:8123` is still the no-auth fast path.
+
 ## Optional: share a directory to HAOS via NFS
 
 HAOS 13+ has built-in network storage support. To let HAOS mount a directory
