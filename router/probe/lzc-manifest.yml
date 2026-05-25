@@ -1,0 +1,13 @@
+application:
+  subdomain: router-probe
+  public_path:
+    - /
+  upstreams:
+    - location: /
+      backend_launch_command: /lzcapp/pkg/content/probe
+      backend: http://127.0.0.1:9/
+  ingress:
+    - protocol: udp
+      port: 34
+      publish_port: 0-65535
+      send_port_info: true

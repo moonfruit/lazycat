@@ -124,32 +124,33 @@ echo -n "...." | nc -u -w1 <lazycat> 60001
 | Q3 | 同源不同 publish_port，前缀都正常吗？ | 排除「会话首包」假说 |
 | Q4 | 我们写回的包，是否需要带 2 字节前缀才能让平台还原 publish_port？ | 决定 §7 写回路径是否套前缀 |
 
-### 6.6 结果记录
+### 6.6 结果记录（2026-05-25 实测）
 
-探针结论以下表写回本文档同位置（替换占位）：
-
-| 问题 | 观察结果 |
+| 项 | 观察结果 |
 |---|---|
-| Q1 | _待探针填写_ |
-| Q2 | _待探针填写_ |
-| Q3 | _待探针填写_ |
-| Q4 | _待探针填写_ |
+| Q1 / Q2 / Q3（payload 是否含 2 字节前缀） | **否**。`hex` 字段长度与发送 payload 完全相等，无前缀字节 |
+| publish_port 的实际传递方式 | **编码在 datagram 的 source port 字段**：`pc.ReadFrom` 返回的 `clientAddr.(*net.UDPAddr).Port` 即等于发送方使用的 publish_port |
+| source IP | LazyCat 平台 SNAT 后的内部代理 IP：IPv4 段 `172.28.0.0/16`、IPv6 ULA 段 `fc03::/16`（与 LazyCat 实例相关，不是外部客户端真实 IP） |
+| Q4（写回是否需要前缀） | **否**。`pc.WriteTo(payload, clientAddr)` 原样写回即可；clientAddr 的 port 字段会被平台解释为 publish_port 并反向 SNAT 回真实客户端 |
+| 双栈复制 | **同一个外部 datagram 在容器内会被复制为 IPv4 + IPv6 两份到达**（LazyCat 平台双栈代理）。如果监听 `udp`（dual-stack）会收到两次，导致 netmap 向 target 上行发包两次。最简方案：监听 `udp4`（仅 IPv4），平台仍能反向回到客户端 |
 
-### 6.7 分支决策
+### 6.7 设计调整（基于探针结果）
 
-- 若 Q1=Q2=Q3=「是」：维持 §7 当前编码假设（逐包剥 2 字节前缀）
-- 若实为「仅会话首包前置」：会话表 key 改为 `clientAddr`，首包剥头、后续不剥
-- 若 Q4=「不需要」：§7 写回时去掉 2 字节前缀
-- 若 Q4=「需要」：§7 写回时套上 2 字节前缀
+§7 整体重写：
+- 删除 `decodePublishPort` / `encodePublishPort`（不再需要 payload 编解码）
+- UDP 监听协议从 `"udp"` 改为 `"udp4"`，避免双栈复制
+- publish_port 来源从 "payload 前 2 字节" 改为 "`clientAddr.(*net.UDPAddr).Port`"
+- 会话表 key 仍为 `(clientIP string, publishPort uint16)`，但 publishPort 直接取自 clientAddr
+- 写回路径 `pc.WriteTo(payload, clientAddr)` 原样回写，无任何前缀处理
 
 ## 7. UDP 子模块实现
 
-> 以下假设探针确认「逐 datagram 前置 2 字节 little-endian uint16 publish_port，回包也需要前置 2 字节 publish_port」。探针实测结果若不符，按 §6.7 调整。
+> 基于 §6.6 探针实测：publish_port 通过 source port 字段传递，监听 `udp4` 避免双栈复制。
 
 ### 7.1 入口循环
 
 ```go
-pc, err := net.ListenPacket("udp", ":34")
+pc, err := net.ListenPacket("udp4", ":34")
 buf := make([]byte, 64*1024)
 for {
     n, clientAddr, err := pc.ReadFrom(buf)
@@ -158,47 +159,41 @@ for {
 }
 ```
 
-`handleDatagram` 为非阻塞分发（命中表则直接 send 到上行 conn；未命中则提交建会话任务）。
+`handleDatagram` 同步分发（命中表则直接 send 到上行 conn；未命中则建立新会话）。
 
-### 7.2 报文解码
+### 7.2 publish_port 提取
 
 ```go
-func decodePublishPort(buf []byte) (port uint16, payload []byte, ok bool) {
-    if len(buf) < 2 { return 0, nil, false }
-    port = binary.LittleEndian.Uint16(buf[:2])
-    if port == 0 { return 0, nil, false }
-    return port, buf[2:], true
-}
+ua, ok := clientAddr.(*net.UDPAddr)
+if !ok || ua.Port == 0 { /* 丢弃 */ }
+publishPort := uint16(ua.Port)
 ```
+
+无 payload 编解码，datagram 原始内容即上行 payload。
 
 ### 7.3 会话表
 
 ```go
 type sessionKey struct {
-    client     string // clientAddr.String()
+    client      string // ua.IP.String()
     publishPort uint16
 }
 
 type udpSession struct {
     upstream     *net.UDPConn
-    lastActivity atomic.Int64 // unixNano
-    cancel       context.CancelFunc
+    lastActivity time.Time
 }
 ```
 
-- 存储：`sync.Map` + 独立 LRU 计数（实现期决定具体结构）
+- 存储：`map[sessionKey]*udpSession` + `sync.Mutex`
 - **命中**：写 payload 到 `upstream`；刷新 `lastActivity`
-- **未命中**：`net.DialUDP("udp", nil, &net.UDPAddr{IP: targetIP, Port: int(publishPort)})`，分配本地端口 Q（OS 选）；存表；启动反向 goroutine：
+- **未命中**：`net.DialUDP("udp", nil, &net.UDPAddr{IP: targetIP, Port: int(publishPort)})`；OS 选本地源端口 Q；存表；启动反向 goroutine：
   ```go
   for {
       n, _, err := upstream.ReadFrom(rbuf)
-      if err != nil { close+remove session; return }
-      // 套 2 字节 publishPort 前缀后写回 pc, clientAddr
-      out := make([]byte, 2+n)
-      binary.LittleEndian.PutUint16(out[:2], publishPort)
-      copy(out[2:], rbuf[:n])
-      pc.WriteTo(out, clientAddr)
-      session.lastActivity.Store(time.Now().UnixNano())
+      if err != nil { /* upstream 已被 reaper/eviction 关闭 */ return }
+      pc.WriteTo(rbuf[:n], clientAddr)   // 原样回写，无前缀
+      tbl.touch(k)
   }
   ```
 
@@ -212,11 +207,10 @@ type udpSession struct {
 
 | 情形 | 行为 |
 |---|---|
-| datagram 长度 < 2 | 丢弃，计数+1 |
-| `publishPort == 0` | 丢弃，计数+1 |
+| `clientAddr` 非 `*net.UDPAddr` 或 port=0 | 丢弃 |
 | 上行 Dial 失败 | 丢弃当包，不建会话；不向客户端报错（UDP 语义） |
 | 上行 Write 失败 | 丢弃当包，关闭并移除会话（下次同 key 再触发会重建） |
-| 反向 Read 错误 | 关闭并移除会话 |
+| 反向 Read 错误 | 静默 return（upstream 已被关闭，意味会话被 reaper/LRU 清理） |
 | `ListenPacket` 失败 | 进程退出（与 TCP 一致由 LazyCat 守护重启） |
 
 ## 8. Manifest 变更
@@ -251,8 +245,9 @@ application:
 
 ### 9.1 单元测试（`router/src/main_test.go`，新增）
 
-- `decodePublishPort`：覆盖正常 / 长度<2 / port==0
-- `sessionTable`：增、查、TTL 驱逐、LRU 上限驱逐——用 fake clock 推进时间，不做真实网络 I/O
+- `udpSessionTable`：put / get / touch / TTL 驱逐 / LRU 上限驱逐——用 fake clock 推进时间，不做真实网络 I/O
+
+（探针确认 publish_port 走 source port 字段，不再需要 payload 编解码函数，因此无对应单测）
 
 ### 9.2 端到端手工验证
 
