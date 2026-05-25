@@ -110,7 +110,11 @@ func (t *udpSessionTable) size() int {
 }
 
 func runUDP(listenPort int, targetIP string) error {
-	pc, err := net.ListenPacket("udp4", net.JoinHostPort("0.0.0.0", strconv.Itoa(listenPort)))
+	// 平台用 dual-stack（IPv4 + IPv6）双路径注入外部 datagram，
+	// "udp4" 收不到 IPv6 那份。Listen "udp" 接受全部副本；
+	// 双份会让 target 上行 + 回包各重复一次，对幂等的 UDP 协议无影响，
+	// 后续若需要去重再加。
+	pc, err := net.ListenPacket("udp", net.JoinHostPort("0.0.0.0", strconv.Itoa(listenPort)))
 	if err != nil {
 		return fmt.Errorf("udp listen :%d failed: %w", listenPort, err)
 	}
