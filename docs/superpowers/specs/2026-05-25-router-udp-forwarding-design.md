@@ -132,16 +132,18 @@ echo -n "...." | nc -u -w1 <lazycat> 60001
 | publish_port 的实际传递方式 | **编码在 datagram 的 source port 字段**：`pc.ReadFrom` 返回的 `clientAddr.(*net.UDPAddr).Port` 即等于发送方使用的 publish_port |
 | source IP | LazyCat 平台 SNAT 后的内部代理 IP：IPv4 段 `172.28.0.0/16`、IPv6 ULA 段 `fc03::/16`（与 LazyCat 实例相关，不是外部客户端真实 IP） |
 | Q4（写回是否需要前缀） | **否**。`pc.WriteTo(payload, clientAddr)` 原样写回即可；clientAddr 的 port 字段会被平台解释为 publish_port 并反向 SNAT 回真实客户端 |
-| 双栈复制 | **同一个外部 datagram 在容器内会被复制为 IPv4 + IPv6 两份到达**（LazyCat 平台双栈代理）。如果监听 `udp`（dual-stack）会收到两次，导致 netmap 向 target 上行发包两次。最简方案：监听 `udp4`（仅 IPv4），平台仍能反向回到客户端 |
+| 双栈复制（初判，部分修正见下行） | 同一个外部 datagram 在容器内会被复制为 IPv4 + IPv6 两份到达（LazyCat 平台双栈代理）。最初据此尝试监听 `udp4`，但实测发现：**监听 `udp4` 后容器收不到任何 datagram**——LazyCat 实际仅经 IPv6 路径注入正向流量，udp4 socket 看不到。故监听必须用 `udp`（dual-stack） |
+| **双份是 target-aware 的**（部署期 2026-05-25 实测） | 实测进一步修正双栈复制结论：**只在 target 不响应（closed port / 无服务）时**，LazyCat 才会把 v4 副本也注入容器；**target 正常响应时仅 v6 一份**。LazyCat ingress 似乎有某种 session-aware 反向 SNAT，正向路径建立后只允许 v6 后续 datagram 注入。结论：**生产可用场景下双份不发生**，无需 dedup |
 
 ### 6.7 设计调整（基于探针结果）
 
 §7 整体重写：
 - 删除 `decodePublishPort` / `encodePublishPort`（不再需要 payload 编解码）
-- UDP 监听协议从 `"udp"` 改为 `"udp4"`，避免双栈复制
+- UDP 监听协议为 **`"udp"`（dual-stack）**——曾尝试 `"udp4"` 但实测 LazyCat 仅经 IPv6 注入正向流量，udp4 socket 收不到任何 datagram
 - publish_port 来源从 "payload 前 2 字节" 改为 "`clientAddr.(*net.UDPAddr).Port`"
 - 会话表 key 仍为 `(clientIP string, publishPort uint16)`，但 publishPort 直接取自 clientAddr
 - 写回路径 `pc.WriteTo(payload, clientAddr)` 原样回写，无任何前缀处理
+- 不做 dedup：实测 target 正常响应时只走 v6 一条路径，双份现象仅在 target 不响应时出现，对生产可用场景无影响
 
 ## 7. UDP 子模块实现
 
