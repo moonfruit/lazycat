@@ -14,8 +14,18 @@ import (
 
 func main() {
 	port := flag.String("port", "10", "the local listen port")
+	udpPort := flag.Int("udp-port", 0, "the local UDP listen port (0 = disabled)")
 	target := flag.String("target", "", "the target ip to forward")
 	flag.Parse()
+
+	if *udpPort > 0 {
+		go func() {
+			if err := runUDP(*udpPort, *target); err != nil {
+				fmt.Printf("UDP loop fatal: %v\n", err)
+				os.Exit(-1)
+			}
+		}()
+	}
 
 	l, err := net.Listen("tcp", net.JoinHostPort("0.0.0.0", *port))
 	if err != nil {
