@@ -4,10 +4,14 @@ application:
     - /
   upstreams:
     - location: /
-      backend_launch_command: /lzcapp/pkg/content/netmap -target=192.168.50.1 -port=33
+      backend_launch_command: /lzcapp/pkg/content/netmap -target=192.168.50.1 -port=33 -udp-port=34
       backend: http://192.168.50.1/
   ingress:
     - protocol: tcp
       port: 33
+      publish_port: 0-65535
+      send_port_info: true
+    - protocol: udp
+      port: 34
       publish_port: 0-65535
       send_port_info: true
