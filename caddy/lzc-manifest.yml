@@ -8,7 +8,7 @@ application:
       use_backend_host: false
 services:
   caddy:
-    image: caddy:2.11.3
+    image: caddy:2.11.4
     binds:
       - /lzcapp/pkg/content/caddy:/pkg
       - /lzcapp/var/config:/config
