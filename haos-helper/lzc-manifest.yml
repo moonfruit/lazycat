@@ -1,0 +1,13 @@
+application:
+  subdomain: haos-helper
+  background_task: true
+  upstreams:
+    - location: /
+      backend_launch_command: /lzcapp/pkg/content/haos-helper -web -listen 127.0.0.1:8080
+      backend: http://127.0.0.1:8080/
+services:
+  agent:
+    image: busybox
+    network_mode: host
+    netadmin: true
+    command: /lzcapp/pkg/content/haos-helper -agent
