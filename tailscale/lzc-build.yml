@@ -1,0 +1,12 @@
+manifest: ./lzc-manifest.yml
+pkgout: ./
+icon: ./lzc-icon.png
+
+compose_override:
+  services:
+    tailscaled:
+      devices:
+        - /dev/net/tun:/dev/net/tun
+      cap_add:
+        - NET_ADMIN
+        - NET_RAW
