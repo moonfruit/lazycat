@@ -68,20 +68,20 @@ HAOS 作为 KVM 虚拟机跑在 LazyCat/LightOS 的 `debian` 开发实例（`clo
 - 对外：routes/ingress → 前端的容器内端口（普通网络，无宿主端口）。
 - **结论：不占用任何宿主 TCP 端口。**
 
-### 4.4 agent 开机自动逻辑（修正后；幂等、部署安全）
+### 4.4 agent 开机自动逻辑 `BootHeal`（前提：debian/lightos 实例自启 OFF）
 
 ```
-若 /proc/devices 无 macvtap:
-    netlink 建一个临时 macvtap(parent=enp2s0) → 删除   # 触发内核加载模块
-    复查 /proc/devices 确认 238 出现（失败则退避重试有限次）
-    重启 lightos: POST 127.0.0.1:7733/.../instance/pause?id=cloud.lazycat.lightos.entry&uid=moon (忽略错误)
-                  POST 127.0.0.1:7733/.../instance/resume?id=...&uid=moon (忽略 400)
-                  轮询 instance/status 至运行态（有超时）
-否则(已存在 macvtap):
-    什么都不做      # 例如部署 helper 时 HAOS 已在跑、macvtap 已载 → 不打断
+1. 确保 macvtap 模块已加载：
+     若 /proc/devices 无 macvtap → netlink 建临时 macvtap(parent=enp2s0)再删 → 触发内核加载 → 复查 238
+2. 若 lightos 实例【未运行】(7733 instance/status != 运行码6) → 启动它：
+     POST .../instance/pause?id=cloud.lazycat.lightos.entry&uid=moon (忽略错误)
+     POST .../instance/resume?id=...&uid=moon (忽略 400；resume 阻塞至启动完成)
+   若 lightos【已运行】→ no-op（部署安全，不打断 HAOS）
 ```
 
-**关键性质**：只有"macvtap 原本不存在、刚被加载"时才重启 lightos；macvtap 已存在则 no-op。**部署/重装 helper 时（HAOS 已运行、238 已在）→ 不触发任何重启、不打断现有系统。** 这正是之前担心的"部署时出问题"的解法。
+**为何破解竞态**：决策依据是"**lightos 是否运行**"而非"模块是否已加载"。因 **debian 自启 OFF**，冷启动时 debian 停止 → 其内 `haos.service` 也不运行 → 无人抢先加载 macvtap，只有 agent 加载、再启动 lightos（此时实例创建对 /proc/devices 快照，含 238）。**部署/重装 helper 时 lightos 已运行 → no-op，不打断。**（早先"模块在场则 no-op"的逻辑在自启 ON 时有竞态：haos 自己 `ip link add type macvtap` 会抢先加载模块、骗过 agent；改为按运行态判定 + 自启 OFF 后消除。）
+
+> 运行态码 6 为实测值（7733 内部枚举，非公开 SDK 的 InstanceStatus 0-4 / AppStatus 0-5）；仅用于"已运行则跳过"的部署安全判定，判错最坏只是 redeploy 多启一次，不影响冷启动关键路径。resume 不再轮询特定 status 码判定成败（已阻塞至启动完成）。
 
 ### 4.5 手动按钮
 
@@ -95,14 +95,16 @@ HAOS 作为 KVM 虚拟机跑在 LazyCat/LightOS 的 `debian` 开发实例（`clo
 - `install.sh`：`systemctl enable haos.service`。
 - `haos-launch.sh`/`haos-network.sh` 逻辑不变。
 
-## 6. 实例自启策略
+## 6. 实例自启策略（必需：OFF）
 
-helper 仅在"macvtap 缺失"时重启 lightos，故自启设置二选一：
+**debian/lightos 实例必须设为"非开机自启"（OFF）**，这是 §4.4 `BootHeal` 逻辑成立的前提：
 
-- **默认（已验证）：debian/lightos 实例自启 ON。** 冷启动时 lightos+debian 先以无 238 的坏白名单启动（HAOS 短暂 EPERM），helper agent 检测到"macvtap 缺失"→加载→重启 lightos→白名单含 238→HAOS 恢复。与已实测路径一致。代价：一次短暂坏启动 + 一次重启。
-- **优化（待实测）：关闭实例自启**，让 helper 的 resume 成为唯一首次启动。**待验证**："关 debian 子实例自启后 `resume id=cloud.lazycat.lightos.entry` 是否仍拉起 debian"——实现阶段先验证再用。
+- 自启 OFF → 冷启动时 debian 停止 → 其内 haos.service 不运行 → 无人抢先加载 macvtap → 无竞态。agent 加载 macvtap 后启动 lightos，白名单必含 238。
+- 若自启 ON → debian 抢先启动并以坏白名单跑 haos（haos 的 `ip link add` 会加载 macvtap 模块），agent 按"是否运行"判定会看到 lightos 已运行 → no-op → HAOS 保持崩溃。**故必须 OFF。**
+- 配置方式：LightOS 面板把该实例的开机自启关闭。
+- haos.service 在 debian 内须 **enabled**（debian 被 agent 启动后，haos 随之自启并打开 macvtap）。
 
-推荐先按"默认 ON"落地。
+> 待实测（test ②/③ 确认）：关自启后 `resume id=cloud.lazycat.lightos.entry` 确能拉起 debian 子实例；以及 7733 对"停止态"返回的 status 码（应 != 6）。
 
 ## 7. 冷启动闭环流程（默认 ON）
 

@@ -18,6 +18,17 @@ type RealActions struct {
 
 func (r *RealActions) MacvtapLoaded() bool { return MacvtapLoadedFromProc() }
 
+// LightosRunning 经 7733 instance/status 判断 lightos 实例是否处于运行态（实测码=6）。
+// 查询失败按"未运行"处理（保守：宁可尝试启动）。
+func (r *RealActions) LightosRunning() bool {
+	st, err := r.Pkgm.Status(instanceID)
+	if err != nil {
+		log.Printf("LightosRunning status check failed: %v", err)
+		return false
+	}
+	return st == statusRunning
+}
+
 // LoadMacvtap 在 enp2s0 上建一个临时 macvtap 接口再删除，触发内核加载 macvtap 模块。
 // 不需要 CAP_SYS_MODULE：内核在 RTM_NEWLINK(kind=macvtap) 时自动 request_module。
 func (r *RealActions) LoadMacvtap() error {
@@ -78,10 +89,10 @@ func (r *RealActions) RestartLightos() error {
 func RunAgent() {
 	acts := &RealActions{Pkgm: NewPkgm()}
 
-	if restarted, err := EnsureMacvtap(acts); err != nil {
-		log.Printf("boot EnsureMacvtap error: %v", err)
+	if started, err := BootHeal(acts); err != nil {
+		log.Printf("boot BootHeal error: %v", err)
 	} else {
-		log.Printf("boot EnsureMacvtap ok: restarted=%v", restarted)
+		log.Printf("boot BootHeal ok: started=%v", started)
 	}
 
 	closer, err := ServeIPC(socketPath, func(req Request) Response {
