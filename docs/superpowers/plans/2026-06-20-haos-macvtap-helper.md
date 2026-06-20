@@ -602,20 +602,21 @@ git commit -m "feat(haos-helper): boot logic (load-if-absent then restart lighto
 
 ### Task 5: agent 模式（netlink macvtap + 真实 Actions + lightos 重启编排 + socket 服务）
 
+> **跨平台说明（重要）**：开发机为 darwin，而 `vishvananda/netlink` 仅 linux 可编译。因此把"用 netlink 的代码"放进 `//go:build linux` 文件、并提供 `//go:build !linux` 的 stub，使 `go test ./...` 在 darwin 上仍能编译运行（纯逻辑测试）。**被 web.go 共用的常量（尤其 `socketPath`）必须放在无 build tag 的公共文件 `constants.go`**，否则 darwin 上 web.go 编译失败。
+
 **Files:**
-- Create: `haos-helper/src/agent.go`
+- Create: `haos-helper/src/constants.go`（无 tag，公共常量）
+- Create: `haos-helper/src/agent.go`（`//go:build linux`，netlink + RealActions + RunAgent）
+- Create: `haos-helper/src/agent_other.go`（`//go:build !linux`，RunAgent stub）
 - Modify: `haos-helper/src/go.mod`（加 netlink 依赖）
 - Create: `haos-helper/src/go.sum`（`go mod tidy` 生成）
 
 **Interfaces:**
 - Consumes: `MacvtapLoadedFromProc`（Task1）、`Pkgm`（Task2）、`ServeIPC`/`Request`/`Response`（Task3）、`Actions`/`EnsureMacvtap`（Task4）。
 - Produces:
-  - 常量：`parentIf="enp2s0"`、`instanceID="cloud.lazycat.lightos.entry"`、`instanceUID="moon"`、`socketPath="/lzcapp/var/ipc/agent.sock"`、`probeIf="lzc-mvprobe"`、`statusRunning=8`。
-  - `type RealActions struct { Pkgm *Pkgm }` 实现 `Actions`：
-    - `MacvtapLoaded()` → `MacvtapLoadedFromProc()`
-    - `LoadMacvtap()` → 用 netlink 在 `enp2s0` 上加一个名为 `lzc-mvprobe` 的 macvtap（bridge 模式）再删除（触发内核加载）；重试有限次直到 `/proc/devices` 出现 macvtap。
-    - `RestartLightos()` → `Pkgm.Pause`（忽略错误）+ `Pkgm.Resume`（忽略 400）+ 轮询 `Pkgm.Status==statusRunning`（超时 90s）。
-  - `func RunAgent()`：建 `RealActions`、启动时跑 `EnsureMacvtap`（记日志）、`ServeIPC` 处理 `status`/`load-macvtap`/`restart-lightos`，阻塞常驻。
+  - `constants.go` 公共常量：`parentIf="enp2s0"`、`instanceID="cloud.lazycat.lightos.entry"`、`instanceUID="moon"`、`socketPath="/lzcapp/var/ipc/agent.sock"`、`probeIf="lzc-mvprobe"`、`statusRunning=8`。
+  - `func RunAgent()`（两平台都有此符号：linux 为真实实现，非 linux 为 stub）。
+  - （仅 linux）`type RealActions struct { Pkgm *Pkgm }` 实现 `Actions`：`MacvtapLoaded()`→`MacvtapLoadedFromProc()`；`LoadMacvtap()`→netlink 在 enp2s0 建临时 macvtap(bridge)再删、复查 238；`RestartLightos()`→`Pkgm.Pause`(忽略)+`Pkgm.Resume`(忽略400)+轮询 `Status==statusRunning`(超时90s)。
 
 - [ ] **Step 1: 加 netlink 依赖**
 
@@ -627,10 +628,28 @@ go mod tidy
 ```
 Expected: `go.mod` 出现 `github.com/vishvananda/netlink`，生成 `go.sum`。
 
-- [ ] **Step 2: 写 agent 实现**
+- [ ] **Step 2: 写公共常量 `constants.go`（无 build tag）**
+
+`haos-helper/src/constants.go`:
+```go
+package main
+
+const (
+	parentIf      = "enp2s0"
+	instanceID    = "cloud.lazycat.lightos.entry"
+	instanceUID   = "moon"
+	socketPath    = "/lzcapp/var/ipc/agent.sock"
+	probeIf       = "lzc-mvprobe"
+	statusRunning = 8 // 实测观测值：pkgm instance/status 运行态=8（未公开，随版本或变）
+)
+```
+
+- [ ] **Step 3: 写 linux agent 实现 `agent.go`（`//go:build linux`）**
 
 `haos-helper/src/agent.go`:
 ```go
+//go:build linux
+
 package main
 
 import (
@@ -639,15 +658,6 @@ import (
 	"time"
 
 	"github.com/vishvananda/netlink"
-)
-
-const (
-	parentIf    = "enp2s0"
-	instanceID  = "cloud.lazycat.lightos.entry"
-	instanceUID = "moon"
-	socketPath  = "/lzcapp/var/ipc/agent.sock"
-	probeIf     = "lzc-mvprobe"
-	statusRunning = 8 // 实测观测值：pkgm instance/status 运行态=8（未公开，随版本或变）
 )
 
 type RealActions struct {
@@ -669,18 +679,15 @@ func (r *RealActions) LoadMacvtap() error {
 			Mode:      netlink.MACVLAN_MODE_BRIDGE,
 		},
 	}
-	// 先清理可能的残留
 	if old, e := netlink.LinkByName(probeIf); e == nil {
 		_ = netlink.LinkDel(old)
 	}
 	if err := netlink.LinkAdd(mvt); err != nil {
 		return fmt.Errorf("add macvtap probe: %w", err)
 	}
-	// 创建即已触发加载；删除临时接口（HAOS 会另建自己的）
 	if l, e := netlink.LinkByName(probeIf); e == nil {
 		_ = netlink.LinkDel(l)
 	}
-	// 复查 /proc/devices，最多等 5s
 	for i := 0; i < 50; i++ {
 		if MacvtapLoadedFromProc() {
 			return nil
@@ -712,7 +719,6 @@ func (r *RealActions) RestartLightos() error {
 func RunAgent() {
 	acts := &RealActions{Pkgm: NewPkgm()}
 
-	// 开机自动逻辑（失败仅记录，不退出——保留 socket 服务以便手动干预）
 	if restarted, err := EnsureMacvtap(acts); err != nil {
 		log.Printf("boot EnsureMacvtap error: %v", err)
 	} else {
@@ -743,24 +749,41 @@ func RunAgent() {
 	}
 	defer closer.Close()
 	log.Printf("agent listening on %s", socketPath)
-	select {} // 常驻
+	select {}
 }
 ```
 
-- [ ] **Step 3: 编译确认（agent 副作用无法在 CI 单测，编译通过即可；逻辑已由 Task4 覆盖）**
+- [ ] **Step 4: 写非 linux stub `agent_other.go`（`//go:build !linux`）**
 
-Run: `cd haos-helper/src && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./...`
-Expected: 编译成功，无输出。
+`haos-helper/src/agent_other.go`:
+```go
+//go:build !linux
 
-- [ ] **Step 4: 跑既有测试确保未回归**
+package main
 
-Run: `cd haos-helper/src && go test ./... -v`
-Expected: 全部 PASS（Task1-4 的测试）。
+import "log"
 
-- [ ] **Step 5: 提交**
+// RunAgent 在非 linux 平台不可用（agent 依赖 netlink/macvtap）。
+// 仅为让包在开发机(darwin)上可编译、跑纯逻辑单测。
+func RunAgent() {
+	log.Fatal("agent mode requires linux")
+}
+```
+
+- [ ] **Step 5: darwin 上跑全部测试 + linux 交叉编译确认**
+
+Run:
+```bash
+cd haos-helper/src
+go test ./... -v                                          # darwin 上跑 Task1-4 纯逻辑测试
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./...       # 确认 linux(含 netlink agent.go) 可编译
+```
+Expected: 测试全 PASS；linux 交叉编译成功无输出。
+
+- [ ] **Step 6: 提交**
 
 ```bash
-git add haos-helper/src/agent.go haos-helper/src/go.mod haos-helper/src/go.sum
+git add haos-helper/src/constants.go haos-helper/src/agent.go haos-helper/src/agent_other.go haos-helper/src/go.mod haos-helper/src/go.sum
 git commit -m "feat(haos-helper): agent mode (netlink macvtap + lightos restart + ipc server)"
 ```
 
