@@ -25,7 +25,7 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - PORT=80
-      - QBIT_BASE=http://_outbound:6880
+      - QBIT_BASE=http://host.lzcapp:6880
       - RELEASE_TYPE=stable
       - UPDATE_VT_CRON=0 * * * *
       {{- if .U.GithubToken }}
