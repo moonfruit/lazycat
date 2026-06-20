@@ -1,0 +1,18 @@
+application:
+  subdomain: macvtap-helper
+  background_task: true
+  upstreams:
+    - location: /
+      backend_launch_command: /lzcapp/pkg/content/macvtap-helper -web -listen 127.0.0.1:8080
+      backend: http://127.0.0.1:8080/
+services:
+  agent:
+    image: busybox
+    network_mode: host
+    netadmin: true
+    command: /lzcapp/pkg/content/macvtap-helper -agent
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /lzcapp/var/ipc/agent.sock"]
+      interval: 5s
+      timeout: 3s
+      retries: 12

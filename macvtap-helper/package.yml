@@ -1,0 +1,4 @@
+package: com.github.moonfruit.macvtap-helper
+version: 0.0.1
+name: Macvtap Helper
+description: 开机加载 macvtap 并在需要时重启 lightos，使 macvtap 部署的 HAOS 冷重启后自动恢复；附状态页与手动按钮。

@@ -44,6 +44,55 @@ ssh moon@debian.dkmooncat.heiyu.space 'sudo ~/haos/install.sh && sudo systemctl 
 
 `install.sh` is idempotent — safe to re-run.
 
+## macvtap-helper & Crash-loop Hardening
+
+### macvtap-helper (recommended)
+
+Install the companion LazyCat application `macvtap-helper` (lives in `../macvtap-helper/`
+in this repo) **on the LazyCat box** (not inside LightOS):
+
+```sh
+cd ../macvtap-helper && make install
+```
+
+`macvtap-helper` runs on the LazyCat host on every boot (`background_task`). Its agent
+(`network_mode: host` + `netadmin`) performs `BootHeal`:
+
+1. **Ensure the `macvtap` kernel module is loaded** — if `/proc/devices` lacks
+   `macvtap`, it creates+deletes a throwaway macvtap on `enp2s0` (via netlink), which
+   makes the kernel auto-load the module. On a cold boot the module is otherwise
+   absent, so any instance whose device-cgroup whitelist is snapshotted before the
+   module loads will permanently miss macvtap (major 238).
+2. **Start the lightos/debian instance if it is not running** (decision based on the
+   instance's *running state*, queried via the local pkgm API — not on whether the
+   module happens to be loaded). Because the module is already loaded in step 1, the
+   instance's whitelist snapshot now includes major 238, so HAOS can open `/dev/tapN`.
+
+**Instance auto-start MUST be OFF.** Set the debian/lightos instance to *not*
+auto-start (LightOS panel). This is required for correctness:
+
+- With auto-start **OFF**: on a cold boot the instance stays stopped, so the HAOS
+  service inside it is not running and cannot load macvtap first. `macvtap-helper`
+  is the only thing that loads macvtap, then starts the instance → whitelist contains
+  238 → HAOS works. No race.
+- With auto-start **ON**: the instance starts first and its HAOS service runs
+  `ip link add … type macvtap`, which *itself* loads the module — fooling any
+  "is the module loaded?" check and leaving the already-snapshotted whitelist without
+  238. HAOS then crash-loops and the helper cannot tell it needs intervention.
+
+`haos.service` must be **enabled** (`systemctl enable`, done by `install.sh`) so that
+when `macvtap-helper` starts the instance, HAOS comes up automatically and opens its
+own macvtap.
+
+### StartLimit hardening (belt-and-suspenders)
+
+`haos.service` declares `StartLimitIntervalSec=600` / `StartLimitBurst=5` in its
+`[Unit]` section (systemd requires StartLimit* in `[Unit]`, not `[Service]`). With the
+auto-start-OFF design HAOS no longer crash-loops at cold boot, but this wide accounting
+window still protects against any transient start failure permanently deactivating the
+unit (the original config had `StartLimitIntervalSec` equal to `RestartSec`, so the
+burst limit never tripped and a failing unit restarted forever).
+
 ## Configure
 
 After first install, edit `/opt/haos/haos.conf` to change:
