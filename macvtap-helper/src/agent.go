@@ -89,12 +89,6 @@ func (r *RealActions) RestartLightos() error {
 func RunAgent() {
 	acts := &RealActions{Pkgm: NewPkgm()}
 
-	if started, err := BootHeal(acts); err != nil {
-		log.Printf("boot BootHeal error: %v", err)
-	} else {
-		log.Printf("boot BootHeal ok: started=%v", started)
-	}
-
 	closer, err := ServeIPC(socketPath, func(req Request) Response {
 		switch req.Action {
 		case "status":
@@ -123,5 +117,17 @@ func RunAgent() {
 	}
 	defer closer.Close()
 	log.Printf("agent listening on %s", socketPath)
+
+	// 开机自愈放后台：冷启动时 BootHeal 会重启 lightos（可能耗时数十秒）。
+	// 先开 socket 让应用快速就绪（healthcheck 通过 → "运行中"），再后台自愈，
+	// 避免应用长时间卡在"启动中"。
+	go func() {
+		if started, err := BootHeal(acts); err != nil {
+			log.Printf("boot BootHeal error: %v", err)
+		} else {
+			log.Printf("boot BootHeal ok: started=%v", started)
+		}
+	}()
+
 	select {}
 }
