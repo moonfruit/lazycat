@@ -28,6 +28,9 @@ services:
       - /lzcapp/var/run:/var/run/tailscale
     healthcheck:
       test: ["CMD-SHELL", "test -S /var/run/tailscale/tailscaled.sock"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
       start_period: 30s
 
   web:
@@ -36,7 +39,7 @@ services:
     command:
       - sh
       - -c
-      - 'while [ ! -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done; exec tailscale web --listen 0.0.0.0:5252 --origin https://$LAZYCAT_APP_DOMAIN'
+      - 'while [ ! -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done; exec tailscale web --listen 0.0.0.0:5252 --origin https://${LAZYCAT_APP_DOMAIN:-tailscale.${LAZYCAT_BOX_DOMAIN}}'
     binds:
       - /lzcapp/var/run:/var/run/tailscale
     depends_on:

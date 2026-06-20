@@ -12,7 +12,7 @@
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
-| Tailscale 主机名 | `{{ BoxName }}` | tailnet 内主机名 |
+| Tailscale 主机名 | `{{ .S.BoxName }}` | tailnet 内主机名 |
 | 广播子网路由 | （空） | 如 `192.168.50.0/24`，需在管理后台批准 |
 | tailscale up 额外参数 | `--accept-routes` | 透传 `tailscale up` |
 | tailscaled 额外参数 | `--port=0` | 随机 WireGuard 端口 |
