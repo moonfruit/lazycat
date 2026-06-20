@@ -16,6 +16,8 @@ echo "Setting WEBUI username/password to 'admin/admin'"
 cat <<EOF >>$CONFIG
 WebUI\AuthSubnetWhitelist=0.0.0.0/0, ::/0
 WebUI\AuthSubnetWhitelistEnabled=true
+WebUI\CSRFProtection=false
+WebUI\HostHeaderValidation=false
 WebUI\LocalHostAuth=false
 WebUI\Password_PBKDF2="@ByteArray(NxKJkBjp982vKvo8z8hiTw==:P6wUC7xhHrhvsCvPmDnVoBeeg0eKeUX5HokyIbBXI4tsJLuOh3roY5UlBgdTlvv0Nj3ubJIDA/uvtn/W/ZnH9A==)"
 EOF
