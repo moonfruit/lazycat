@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Request struct {
@@ -52,12 +53,14 @@ func ServeIPC(socketPath string, handle func(Request) Response) (io.Closer, erro
 }
 
 // CallIPC 连接 unix socket，发一条 Request、读一条 Response。
+// dial 超时 5s；读写 deadline 120s（覆盖 restart-lightos 最长 ~90s 的等待）。
 func CallIPC(socketPath string, req Request) (Response, error) {
-	conn, err := net.Dial("unix", socketPath)
+	conn, err := net.DialTimeout("unix", socketPath, 5*time.Second)
 	if err != nil {
 		return Response{}, err
 	}
 	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(120 * time.Second))
 	if err := json.NewEncoder(conn).Encode(req); err != nil {
 		return Response{}, err
 	}

@@ -38,4 +38,8 @@ func TestWebButtonForwardsToAgent(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("expected redirect, code=%d", rec.Code)
 	}
+	loc := rec.Header().Get("Location")
+	if !strings.Contains(loc, "msg=") {
+		t.Fatalf("redirect Location=%q does not contain msg", loc)
+	}
 }

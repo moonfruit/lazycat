@@ -17,7 +17,7 @@ type Pkgm struct {
 func NewPkgm() *Pkgm {
 	return &Pkgm{
 		Base: "http://127.0.0.1:7733/api/app",
-		HTTP: &http.Client{Timeout: 30 * time.Second},
+		HTTP: &http.Client{Timeout: 180 * time.Second},
 	}
 }
 

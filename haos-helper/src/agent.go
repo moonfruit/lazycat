@@ -5,12 +5,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/vishvananda/netlink"
 )
 
 type RealActions struct {
+	mu   sync.Mutex
 	Pkgm *Pkgm
 }
 
@@ -19,6 +21,9 @@ func (r *RealActions) MacvtapLoaded() bool { return MacvtapLoadedFromProc() }
 // LoadMacvtap 在 enp2s0 上建一个临时 macvtap 接口再删除，触发内核加载 macvtap 模块。
 // 不需要 CAP_SYS_MODULE：内核在 RTM_NEWLINK(kind=macvtap) 时自动 request_module。
 func (r *RealActions) LoadMacvtap() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	parent, err := netlink.LinkByName(parentIf)
 	if err != nil {
 		return fmt.Errorf("find parent %s: %w", parentIf, err)
@@ -49,6 +54,9 @@ func (r *RealActions) LoadMacvtap() error {
 
 // RestartLightos 重启 lightos 实例：pause(忽略错误)+resume(忽略400)+轮询至运行态。
 func (r *RealActions) RestartLightos() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if err := r.Pkgm.Pause(instanceID, instanceUID); err != nil {
 		log.Printf("pause (ignored): %v", err)
 	}
@@ -78,7 +86,11 @@ func RunAgent() {
 	closer, err := ServeIPC(socketPath, func(req Request) Response {
 		switch req.Action {
 		case "status":
-			st, _ := acts.Pkgm.Status(instanceID)
+			st, err := acts.Pkgm.Status(instanceID)
+			if err != nil {
+				log.Printf("status error: %v", err)
+				return Response{OK: false, MacvtapLoaded: acts.MacvtapLoaded(), InstanceStatus: 0, Message: "status error: " + err.Error()}
+			}
 			return Response{OK: true, MacvtapLoaded: acts.MacvtapLoaded(), InstanceStatus: st, Message: "ok"}
 		case "load-macvtap":
 			if err := acts.LoadMacvtap(); err != nil {
