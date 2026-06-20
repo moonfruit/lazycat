@@ -107,7 +107,7 @@ helper 仅在"macvtap 缺失"时重启 lightos，故自启设置二选一：
 ## 7. 冷启动闭环流程（默认 ON）
 
 1. 物理机硬重启 → macvtap 未载；lightos+debian 自启（坏白名单，HAOS 暂 EPERM）。
-2. `haos-helper` 启动：前端常驻出页；agent 开机逻辑发现 `/proc/devices` 无 macvtap → netlink 加载 → 重启 lightos（pause+resume，忽略 400，轮询至运行）。
+2. `macvtap-helper` 启动：前端常驻出页；agent 开机逻辑发现 `/proc/devices` 无 macvtap → netlink 加载 → 重启 lightos（pause+resume，忽略 400，轮询至运行）。
 3. lightos 重启 debian → 白名单重新快照**含 238** → `haos.service`(enabled) 打开 `/dev/tapN` → HAOS 带 LAN 独立 IP 上线、设备发现正常。
 
 无用户、无 token、无 ticket、无宿主端口。
@@ -125,7 +125,7 @@ helper 仅在"macvtap 缺失"时重启 lightos，故自启设置二选一：
 ## 9. 仓库结构（新增/改动）
 
 ```
-haos-helper/                 # 新增 helper .lpk 源（Go 单二进制双模式）
+macvtap-helper/                 # 新增 helper .lpk 源（Go 单二进制双模式）
   lzc-manifest.yml           # upstreams.backend_launch_command(前端) + services.agent(host+netadmin)
   package.yml                # package/version/name/description
   lzc-build.yml              # buildscript: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C src build -o ../dist/ ; contentdir: ./dist
@@ -136,7 +136,7 @@ haos-helper/                 # 新增 helper .lpk 源（Go 单二进制双模式
 haos/                        # 改动
   lib/haos.service           # enable + StartLimit 硬化
   install.sh                 # systemctl enable haos.service
-  README.md                  # 增补：装 haos-helper、实例自启策略、限流说明
+  README.md                  # 增补：装 macvtap-helper、实例自启策略、限流说明
 ```
 不新增 `docker/` 自建镜像（agent 用 stock 镜像）。
 
@@ -150,7 +150,7 @@ haos/                        # 改动
 ## 11. 测试策略
 
 - **集成（box 上）**：
-  1. 部署 `haos-helper`，确认前端状态页可访问、agent socket 就绪、按钮可用。
+  1. 部署 `macvtap-helper`，确认前端状态页可访问、agent socket 就绪、按钮可用。
   2. 模拟冷态：停 HAOS → 宿主 `rmmod macvtap` → 触发 agent 开机逻辑 → 观察 netlink 载模块 + 重启 lightos → 白名单 prog id 变化且含 238 → HAOS 自启打开 macvtap。
   3. 部署安全：HAOS 健康时重装 helper → 确认 agent no-op、不打断。
   4. 真·冷重启：择机整机重启，开机后无人工干预 HAOS 应自动上线并拿到 LAN IP。

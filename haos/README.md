@@ -44,18 +44,18 @@ ssh moon@debian.dkmooncat.heiyu.space 'sudo ~/haos/install.sh && sudo systemctl 
 
 `install.sh` is idempotent — safe to re-run.
 
-## haos-helper & Crash-loop Hardening
+## macvtap-helper & Crash-loop Hardening
 
-### haos-helper (recommended)
+### macvtap-helper (recommended)
 
-Install the companion LazyCat application `haos-helper` (lives in `../haos-helper/`
+Install the companion LazyCat application `macvtap-helper` (lives in `../macvtap-helper/`
 in this repo) **on the LazyCat box** (not inside LightOS):
 
 ```sh
-cd ../haos-helper && make install
+cd ../macvtap-helper && make install
 ```
 
-`haos-helper` runs on the LazyCat host on every boot and:
+`macvtap-helper` runs on the LazyCat host on every boot and:
 
 1. Loads the `macvtap` kernel module before HAOS starts — the module is absent at
    the moment LazyCat creates devices during a cold reboot, so HAOS's first startup
@@ -65,7 +65,7 @@ cd ../haos-helper && make install
 
 **Instance auto-start strategy**: keep the debian/lightos instance auto-start **ON**
 (the default). After a cold reboot the sequence is: instance starts → HAOS first
-attempt fails (macvtap not yet present) → `haos-helper` loads module and restarts
+attempt fails (macvtap not yet present) → `macvtap-helper` loads module and restarts
 the service → HAOS comes up normally. Turning auto-start off would prevent HAOS from
 starting at all without manual intervention.
 
@@ -75,7 +75,7 @@ starting at all without manual intervention.
 `[Unit]` section (systemd requires StartLimit* in `[Unit]`, not `[Service]`). This
 prevents a crash-storm: without a wide accounting window, rapid restart failures
 during the cold-boot macvtap-absent window cause systemd to permanently deactivate
-the unit before `haos-helper` gets a chance to intervene. With a 600 s window the
+the unit before `macvtap-helper` gets a chance to intervene. With a 600 s window the
 unit stays restartable long enough for the helper to recover it.
 
 `haos.service` is also **enabled** (`systemctl enable`) by `install.sh` so it

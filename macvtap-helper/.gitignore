@@ -1,3 +1,4 @@
 app.lpk
 dist/
+src/macvtap-helper
 src/haos-helper

@@ -1,5 +1,0 @@
-buildscript: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C src build -o ../dist/haos-helper
-manifest: ./lzc-manifest.yml
-contentdir: ./dist
-pkgout: ./
-icon: ./lzc-icon.png

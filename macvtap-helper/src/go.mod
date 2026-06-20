@@ -1,4 +1,4 @@
-module haos-helper
+module macvtap-helper
 
 go 1.22
 
