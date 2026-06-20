@@ -1,0 +1,43 @@
+params:
+  - id: ts_hostname
+    type: string
+    name: Tailscale hostname
+    default_value: "{{ .S.BoxName }}"
+    description: "The hostname for this node on your tailnet."
+    optional: true
+
+  - id: ts_routes
+    type: string
+    name: Advertise subnet routes
+    default_value: ""
+    description: "Comma-separated CIDRs to advertise, e.g. 192.168.50.0/24. Must be approved in the Tailscale admin console."
+    optional: true
+
+  - id: ts_extra_args
+    type: string
+    name: tailscale up extra args
+    default_value: "--accept-routes"
+    description: "Extra flags passed to `tailscale up`. See https://tailscale.com/kb/1080/cli"
+    optional: true
+
+  - id: ts_tailscaled_extra_args
+    type: string
+    name: tailscaled extra args
+    default_value: "--port=0"
+    description: "Extra flags passed to `tailscaled`. --port=0 picks a random WireGuard port."
+    optional: true
+
+locales:
+  zh:
+    ts_hostname:
+      name: "Tailscale 主机名"
+      description: "本节点在 tailnet 上的主机名。"
+    ts_routes:
+      name: "广播子网路由"
+      description: "以逗号分隔的 CIDR，如 192.168.50.0/24；需在 Tailscale 管理后台批准后生效。"
+    ts_extra_args:
+      name: "tailscale up 额外参数"
+      description: "透传给 `tailscale up` 的参数，参考 https://tailscale.com/kb/1080/cli"
+    ts_tailscaled_extra_args:
+      name: "tailscaled 额外参数"
+      description: "透传给 `tailscaled` 的参数。--port=0 表示随机 WireGuard 端口。"
