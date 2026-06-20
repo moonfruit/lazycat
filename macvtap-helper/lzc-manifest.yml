@@ -7,7 +7,7 @@ application:
       backend: http://127.0.0.1:8080/
 services:
   agent:
-    image: busybox
+    image: busybox:1.38.0
     network_mode: host
     netadmin: true
     command: /lzcapp/pkg/content/macvtap-helper -agent

@@ -1,10 +1,10 @@
 module macvtap-helper
 
-go 1.22
+go 1.25.0
 
-require github.com/vishvananda/netlink v1.3.0
+require github.com/vishvananda/netlink v1.3.1
 
 require (
-	github.com/vishvananda/netns v0.0.4 // indirect
-	golang.org/x/sys v0.10.0 // indirect
+	github.com/vishvananda/netns v0.0.5 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 )
