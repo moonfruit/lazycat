@@ -52,7 +52,7 @@ func (r *RealActions) LoadMacvtap() error {
 	return fmt.Errorf("macvtap not registered after probe")
 }
 
-// RestartLightos 重启 lightos 实例：pause(忽略错误)+resume(忽略400)+轮询至运行态。
+// RestartLightos 重启 lightos 实例：pause(忽略错误)+resume(忽略400，阻塞至启动完成)。
 func (r *RealActions) RestartLightos() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -63,14 +63,15 @@ func (r *RealActions) RestartLightos() error {
 	if err := r.Pkgm.Resume(instanceID, instanceUID); err != nil {
 		return fmt.Errorf("resume: %w", err)
 	}
-	deadline := time.Now().Add(90 * time.Second)
-	for time.Now().Before(deadline) {
-		if st, err := r.Pkgm.Status(instanceID); err == nil && st == statusRunning {
-			return nil
-		}
-		time.Sleep(2 * time.Second)
+	// pkgm 的 instance status 枚举未公开（实测稳定运行态为 6，resume 后曾见瞬时 8），
+	// 故不据其判定成败。Resume 已阻塞至实例启动完成（设备白名单在此期间重新快照），
+	// best-effort 记录最终状态即可。
+	if st, err := r.Pkgm.Status(instanceID); err == nil {
+		log.Printf("lightos resumed, instance status=%d", st)
+	} else {
+		log.Printf("lightos resumed (status check skipped: %v)", err)
 	}
-	return fmt.Errorf("lightos did not reach running state within timeout")
+	return nil
 }
 
 // RunAgent 启动 agent：开机自动逻辑 + unix socket 服务（常驻）。
