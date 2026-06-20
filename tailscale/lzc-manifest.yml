@@ -1,0 +1,43 @@
+name: Tailscale
+package: com.github.moonfruit.tailscale
+version: 1.98.4
+description: 将设备和用户接入你专属的安全虚拟专用网络（官方镜像 + OAuth 登录）。
+
+application:
+  subdomain: tailscale
+  background_task: true
+  routes:
+    - /=http://web:5252/
+
+services:
+  tailscaled:
+    image: tailscale/tailscale:v1.98.4
+    network_mode: host
+    netadmin: true
+    environment:
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
+      - TS_USERSPACE=0
+      - TS_ACCEPT_DNS=false
+      - TS_HOSTNAME={{ .U.ts_hostname }}
+      - TS_ROUTES={{ .U.ts_routes }}
+      - TS_EXTRA_ARGS={{ .U.ts_extra_args }}
+      - TS_TAILSCALED_EXTRA_ARGS={{ .U.ts_tailscaled_extra_args }}
+    binds:
+      - /lzcapp/var/data:/var/lib
+      - /lzcapp/var/run:/var/run/tailscale
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /var/run/tailscale/tailscaled.sock"]
+      start_period: 30s
+
+  web:
+    image: tailscale/tailscale:v1.98.4
+    entrypoint: ""
+    command:
+      - sh
+      - -c
+      - 'while [ ! -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done; exec tailscale web --listen 0.0.0.0:5252 --origin https://$LAZYCAT_APP_DOMAIN'
+    binds:
+      - /lzcapp/var/run:/var/run/tailscale
+    depends_on:
+      - tailscaled
