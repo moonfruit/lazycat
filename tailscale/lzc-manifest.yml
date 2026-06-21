@@ -19,6 +19,9 @@ services:
     entrypoint: ""
     command: "sh /lzcapp/pkg/content/tailscaled.sh"
     environment:
+      # 强制 nftables 后端：本机默认 iptables(legacy)，而宿主/Docker 走 nft(FORWARD policy DROP)，
+      # 否则 tailscale 的子网转发 ACCEPT 规则写进 legacy 形同虚设，转发流量被 nft 丢弃。
+      - TS_DEBUG_FIREWALL_MODE=nftables
       # if/else 总是输出一项：既避免空值渲染 "<no value>"，又避免 environment 为空(解码器要求非空)。
       {{- if .U.ts_tailscaled_extra_args }}
       - TS_TAILSCALED_EXTRA_ARGS={{ .U.ts_tailscaled_extra_args }}
