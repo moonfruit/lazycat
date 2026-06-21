@@ -10,30 +10,16 @@ application:
     - /=http://web:5252/
 
 services:
+  # 直跑 tailscaled（不经 containerboot，避免无 authkey 时的 60s 启动死线）。
+  # 仅 tailscaled 自身参数；tailscale CLI 配置交给 web 容器。
   tailscaled:
     image: tailscale/tailscale:v1.98.4
     network_mode: host
     netadmin: true
+    entrypoint: ""
+    command: "sh /lzcapp/pkg/content/tailscaled.sh"
     environment:
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
-      - TS_USERSPACE=0
-      - TS_ACCEPT_DNS=false
-      # 空参数必须用 if-守卫：模板对空/未设值渲染字面量 "<no value>"，
-      # 会让 containerboot 误入 subnet-router 模式并把它当路由解析而崩溃。
-      {{- if .U.ts_hostname }}
-      - TS_HOSTNAME={{ .U.ts_hostname }}
-      {{- else }}
-      - TS_HOSTNAME={{ .S.BoxName }}
-      {{- end }}
-      {{- if .U.ts_routes }}
-      - TS_ROUTES={{ .U.ts_routes }}
-      {{- end }}
-      {{- if .U.ts_extra_args }}
-      - TS_EXTRA_ARGS={{ .U.ts_extra_args }}
-      {{- else }}
-      - TS_EXTRA_ARGS=--accept-routes
-      {{- end }}
+      # if/else 总是输出一项：既避免空值渲染 "<no value>"，又避免 environment 为空(解码器要求非空)。
       {{- if .U.ts_tailscaled_extra_args }}
       - TS_TAILSCALED_EXTRA_ARGS={{ .U.ts_tailscaled_extra_args }}
       {{- else }}
@@ -49,11 +35,25 @@ services:
       retries: 12
       start_period: 30s
 
+  # tailscale web 登录/管理 UI，并把 hostname/routes/extra 等 CLI 配置应用到共享守护进程。
   web:
     image: tailscale/tailscale:v1.98.4
     entrypoint: ""
-    # lazycat 部署解码器要求 command 为字符串（非列表）；按 compose 语义会 shlex 拆为 [sh, -c, <script>]
-    command: "sh -c 'while [ ! -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done; exec tailscale web --listen 0.0.0.0:5252 --origin https://${LAZYCAT_APP_DOMAIN:-tailscale.${LAZYCAT_BOX_DOMAIN}}'"
+    command: "sh /lzcapp/pkg/content/web.sh"
+    environment:
+      {{- if .U.ts_hostname }}
+      - TS_HOSTNAME={{ .U.ts_hostname }}
+      {{- else }}
+      - TS_HOSTNAME={{ .S.BoxName }}
+      {{- end }}
+      {{- if .U.ts_routes }}
+      - TS_ROUTES={{ .U.ts_routes }}
+      {{- end }}
+      {{- if .U.ts_extra_args }}
+      - TS_EXTRA_ARGS={{ .U.ts_extra_args }}
+      {{- else }}
+      - TS_EXTRA_ARGS=--accept-routes
+      {{- end }}
     binds:
       - /lzcapp/var/run:/var/run/tailscale
     depends_on:
