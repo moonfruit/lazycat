@@ -15,9 +15,9 @@ params:
 
   - id: ts_extra_args
     type: string
-    name: tailscale up extra args
+    name: tailscale set flags
     default_value: "--accept-routes"
-    description: "Extra flags passed to `tailscale up`. See https://tailscale.com/kb/1080/cli"
+    description: "Flags applied via `tailscale set` after login (e.g. --accept-routes, --ssh, --advertise-exit-node, --shields-up). Only `tailscale set` flags work here, not `tailscale up`-only flags. See https://tailscale.com/kb/1241/tailscale-set"
     optional: true
 
   - id: ts_tailscaled_extra_args
@@ -36,8 +36,8 @@ locales:
       name: "广播子网路由"
       description: "以逗号分隔的 CIDR，如 192.168.50.0/24；需在 Tailscale 管理后台批准后生效。"
     ts_extra_args:
-      name: "tailscale up 额外参数"
-      description: "透传给 `tailscale up` 的参数，参考 https://tailscale.com/kb/1080/cli"
+      name: "tailscale set 参数"
+      description: "登录后经 `tailscale set` 应用的参数（如 --accept-routes、--ssh、--advertise-exit-node、--shields-up）。仅支持 `tailscale set` 的参数，不能用 `tailscale up` 专有参数。参考 https://tailscale.com/kb/1241/tailscale-set"
     ts_tailscaled_extra_args:
       name: "tailscaled 额外参数"
       description: "透传给 `tailscaled` 的参数。--port=0 表示随机 WireGuard 端口。"
