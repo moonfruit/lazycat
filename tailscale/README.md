@@ -47,16 +47,16 @@
 
 ## 本机 CLI 诊断（从盒子 tailscaled 视角看直连/中继）
 
-盒子的 `web` 容器内跑了一个哑字节转发器 `tsproxy`，把 tailscaled 的 LocalAPI（unix socket）暴露成 **裸 TCP `:5253`**，经 `ingress` 发布。本机把它桥回成本地 unix socket，再喂给 `tailscale --socket` —— 于是 `tailscale status`/`ping` 直接以**盒子的视角**运行（CLI 二进制配 `--socket` 时不需要本机跑 tailscaled）。
+盒子的 `web` 容器内跑了一个哑字节转发器 `tsproxy`，把 tailscaled 的 LocalAPI（unix socket）暴露成 **裸 TCP `:5253`**，经 `ingress` 发布到**懒猫网络**的应用域名上（本盒子为 `tailscale.dkmooncat.heiyu.space`）。本机把它桥回成本地 unix socket，再喂给 `tailscale --socket` —— 于是 `tailscale status`/`ping` 直接以**盒子的视角**运行（CLI 二进制配 `--socket` 时不需要本机跑 tailscaled）。
 
-> ⚠️ **安全**：`:5253` 是**裸 TCP、无 SSO**，且**常开**。能连到 `盒子:5253` 的人即可经 LocalAPI **完全控制**盒子 tailscaled（改路由、登出等）。请用 **Tailscale ACL** 限制可达该端口的节点；若不想暴露在 LAN，再用路由器/盒子防火墙限制 `5253` 的源地址。
+> ⚠️ **安全**：`:5253` 经 `ingress` 发布在**懒猫网络**（`tailscale.<盒子域名>`）上，是**裸 TCP、无 SSO、且常开**的特权口——凡能接入你懒猫网络的设备连上它即可经 LocalAPI **完全控制**盒子 tailscaled（改路由、登出等）。它不在公网/裸 LAN 上，但请确保你的懒猫网络只接入可信设备。
 
-一次性准备：`brew install tailscale socat`。
+一次性准备：`brew install tailscale socat`。（本机 `tailscale` CLI 版本与盒子的 `v1.98.4` 不同通常不影响 `status`/`ping`，LocalAPI 对此向后兼容。）
 
 手动用法：
 ```bash
-# 盒子地址：LAN IP（如 192.168.50.11）或经 sing-box 路由到的 tailnet IP 任一
-socat UNIX-LISTEN:/tmp/box.sock,fork,reuseaddr TCP:192.168.50.11:5253 &
+# 盒子地址 = 懒猫网络上的应用域名 tailscale.<你的盒子域名>
+socat UNIX-LISTEN:/tmp/box.sock,fork,reuseaddr TCP:tailscale.dkmooncat.heiyu.space:5253 &
 tailscale --socket=/tmp/box.sock status
 tailscale --socket=/tmp/box.sock ping <对端节点>
 ```
@@ -65,7 +65,7 @@ tailscale --socket=/tmp/box.sock ping <对端节点>
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-BOX="${TS_BOX_ADDR:-192.168.50.11}:5253"
+BOX="${TS_BOX_ADDR:-tailscale.dkmooncat.heiyu.space}:5253"
 SOCK="/tmp/ts-box.sock"
 # 起桥（若未在跑）
 if ! socat -T0 /dev/null UNIX-CONNECT:"$SOCK" 2>/dev/null; then
@@ -75,7 +75,7 @@ if ! socat -T0 /dev/null UNIX-CONNECT:"$SOCK" 2>/dev/null; then
 fi
 exec tailscale --socket="$SOCK" "$@"
 ```
-用法：`ts-box status` / `ts-box ping <对端节点>`（盒子地址可用 `TS_BOX_ADDR` 覆盖）。
+用法：`ts-box status` / `ts-box ping <对端节点>`（盒子地址可用 `TS_BOX_ADDR` 覆盖，默认 `tailscale.dkmooncat.heiyu.space`）。
 
 ## 更新
 

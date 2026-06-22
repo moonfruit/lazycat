@@ -15,9 +15,14 @@ sed -e 's/^version:.*/version: '"$VERSION"'/;' \
 echo "Using version: $VERSION"
 echo
 
+echo " --- === Updating Go deps === ---"
+go -C src get -u ./...
+go -C src mod tidy
+echo
+
 if [[ $1 != "-N" ]]; then
-    if ! git diff --quiet lzc-manifest.yml; then
+    if ! git diff --quiet -- lzc-manifest.yml src; then
         echo " --- === Result === ---"
-        git diff lzc-manifest.yml
+        git diff -- lzc-manifest.yml src
     fi
 fi
