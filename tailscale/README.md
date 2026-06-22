@@ -45,6 +45,38 @@
 
 `tailscaled` 在 `100.100.100.100`（MagicDNS）提供 tailnet 内名称解析。要让局域网经路由器解析 `*.ts.net`，需把这些域名的 DNS 查询指向懒猫，并在懒猫侧再转发给 `100.100.100.100`。本应用未内置该 DNS 转发；如需，可另行部署 dnsmasq 之类转发器并在路由器 DNS 配置中指向懒猫。属可探讨方案，存在 MagicDNS 仅对 tailnet 生效等局限。
 
+## 本机 CLI 诊断（从盒子 tailscaled 视角看直连/中继）
+
+盒子的 `web` 容器内跑了一个哑字节转发器 `tsproxy`，把 tailscaled 的 LocalAPI（unix socket）暴露成 **裸 TCP `:5253`**，经 `ingress` 发布。本机把它桥回成本地 unix socket，再喂给 `tailscale --socket` —— 于是 `tailscale status`/`ping` 直接以**盒子的视角**运行（CLI 二进制配 `--socket` 时不需要本机跑 tailscaled）。
+
+> ⚠️ **安全**：`:5253` 是**裸 TCP、无 SSO**，且**常开**。能连到 `盒子:5253` 的人即可经 LocalAPI **完全控制**盒子 tailscaled（改路由、登出等）。请用 **Tailscale ACL** 限制可达该端口的节点；若不想暴露在 LAN，再用路由器/盒子防火墙限制 `5253` 的源地址。
+
+一次性准备：`brew install tailscale socat`。
+
+手动用法：
+```bash
+# 盒子地址：LAN IP（如 192.168.50.11）或经 sing-box 路由到的 tailnet IP 任一
+socat UNIX-LISTEN:/tmp/box.sock,fork,reuseaddr TCP:192.168.50.11:5253 &
+tailscale --socket=/tmp/box.sock status
+tailscale --socket=/tmp/box.sock ping <对端节点>
+```
+
+包装脚本 `ts-box`（放进 `$PATH`，把起桥 + 调 CLI 合一）：
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+BOX="${TS_BOX_ADDR:-192.168.50.11}:5253"
+SOCK="/tmp/ts-box.sock"
+# 起桥（若未在跑）
+if ! socat -T0 /dev/null UNIX-CONNECT:"$SOCK" 2>/dev/null; then
+	rm -f "$SOCK"
+	socat UNIX-LISTEN:"$SOCK",fork,reuseaddr TCP:"$BOX" &
+	for _ in $(seq 1 50); do [ -S "$SOCK" ] && break; sleep 0.1; done
+fi
+exec tailscale --socket="$SOCK" "$@"
+```
+用法：`ts-box status` / `ts-box ping <对端节点>`（盒子地址可用 `TS_BOX_ADDR` 覆盖）。
+
 ## 更新
 
 `./update.sh` 从 GitHub 取 `tailscale/tailscale` 最新发布版，就地替换 `lzc-manifest.yml` 的 `version:` 与镜像 tag。
