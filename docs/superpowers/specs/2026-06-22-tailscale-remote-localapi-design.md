@@ -51,6 +51,8 @@
 
 ## 5. 盒子侧改动
 
+> 为何用 Go 而非现成工具：已核实 `tailscale/tailscale:v1.98.4` 是 Alpine+busybox，**无 `socat`**；`nc` 是 busybox nc（有 `-e`/`-lk`，但**无 `-U`**，不支持 unix socket），镜像内无任何工具能从 stdio 连到 unix socket，故做不出 TCP↔unix 桥。运行时 `apk add socat` 脆（依赖启动时有网+apk 源）、自建带 socat 镜像更重，均劣于一个自包含 Go 二进制。
+
 1. **新增 Go 转发器 `tsproxy`**（`tailscale/src/`，沿用 `netcat`/`router` 的 Go-companion 惯例，stdlib only）：
    - 标志：`-listen :5253`（默认）、`-socket /var/run/tailscale/tailscaled.sock`（默认）。
    - 逻辑：`net.Listen("tcp", listen)`；每个连接 `net.Dial("unix", socket)` 后双向 `io.Copy`；dial 失败则关连接（容忍 socket 尚未就绪）。约 ~50 行。
