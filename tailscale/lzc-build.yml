@@ -3,6 +3,9 @@ contentdir: ./content
 pkgout: ./
 icon: ./lzc-icon.png
 
+# 交叉编译 tsproxy（TCP<->unix 转发器）到 content/，随内容一并打包。
+buildscript: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C src build -o ../content/tsproxy
+
 compose_override:
   services:
     tailscaled:

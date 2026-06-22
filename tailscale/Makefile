@@ -1,10 +1,10 @@
 all: app.lpk
 
-app.lpk: lzc-*
+app.lpk: lzc-* src/*
 	lzc-cli project build -o app.lpk
 
 clean:
-	rm -f app.lpk
+	rm -f app.lpk content/tsproxy
 
 install: app.lpk
 	lzc-cli app install app.lpk
