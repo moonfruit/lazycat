@@ -12,6 +12,10 @@ origin="https://${LAZYCAT_APP_DOMAIN:-tailscale.${LAZYCAT_BOX_DOMAIN}}"
 # 等待共享 socket 就绪（tailscaled 容器创建）
 while [ ! -S "$sock" ]; do sleep 1; done
 
+# 暴露 LocalAPI 给本机 tailscale CLI 诊断：哑字节 TCP->unix 转发器，经 ingress 发布 5253。
+# 仅转发原始字节；Host/Sec-Tailscale 头由本机 CLI 自带，本进程以 root 连 socket 满足 peercred。
+/lzcapp/pkg/content/tsproxy -listen :5253 -socket "$sock" &
+
 hostname="${TS_HOSTNAME:-${LAZYCAT_BOX_NAME:-}}"
 extra="${TS_EXTRA_ARGS:---accept-routes}"
 
