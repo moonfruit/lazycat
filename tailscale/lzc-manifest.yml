@@ -8,6 +8,12 @@ application:
   background_task: true
   routes:
     - /=http://web:5252/
+  # 把 web 容器内 tsproxy 的 :5253 发布为盒子裸 TCP 口，供本机 tailscale CLI 诊断。
+  ingress:
+    - protocol: tcp
+      port: 5253
+      publish_port: 5253
+      service: web
 
 services:
   # 直跑 tailscaled（不经 containerboot，避免无 authkey 时的 60s 启动死线）。
