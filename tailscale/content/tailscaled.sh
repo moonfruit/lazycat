@@ -12,9 +12,9 @@ set -eu
 
 mkdir -p /var/lib/tailscale /var/run/tailscale
 
-# 默认 --port=0（随机 WireGuard 端口）；用户在 TS_TAILSCALED_EXTRA_ARGS 覆盖时以其为准。
+# 不传 --port，使用 tailscaled 内置默认端口（41641）；用户经 TS_TAILSCALED_EXTRA_ARGS 自行覆盖。
 # 内核 TUN 模式为 tailscaled 默认（容器已挂 /dev/net/tun + NET_ADMIN/NET_RAW）。
 exec tailscaled \
 	--statedir=/var/lib/tailscale \
 	--socket=/var/run/tailscale/tailscaled.sock \
-	${TS_TAILSCALED_EXTRA_ARGS:---port=0}
+	${TS_TAILSCALED_EXTRA_ARGS:-}

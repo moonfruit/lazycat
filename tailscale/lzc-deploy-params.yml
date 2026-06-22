@@ -23,8 +23,8 @@ params:
   - id: ts_tailscaled_extra_args
     type: string
     name: tailscaled extra args
-    default_value: "--port=0"
-    description: "Extra flags passed to `tailscaled`. --port=0 picks a random WireGuard port."
+    default_value: ""
+    description: "Extra flags passed to `tailscaled`. Leave empty to use the default WireGuard port (41641); set --port=0 to pick a random one."
     optional: true
 
 locales:
@@ -40,4 +40,4 @@ locales:
       description: "登录后经 `tailscale set` 应用的参数（如 --accept-routes、--ssh、--advertise-exit-node、--shields-up）。仅支持 `tailscale set` 的参数，不能用 `tailscale up` 专有参数。参考 https://tailscale.com/kb/1241/tailscale-set"
     ts_tailscaled_extra_args:
       name: "tailscaled 额外参数"
-      description: "透传给 `tailscaled` 的参数。--port=0 表示随机 WireGuard 端口。"
+      description: "透传给 `tailscaled` 的参数。留空使用默认 WireGuard 端口（41641）；填 --port=0 则随机选端口。"

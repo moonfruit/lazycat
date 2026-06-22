@@ -28,11 +28,10 @@ services:
       # 强制 nftables 后端：本机默认 iptables(legacy)，而宿主/Docker 走 nft(FORWARD policy DROP)，
       # 否则 tailscale 的子网转发 ACCEPT 规则写进 legacy 形同虚设，转发流量被 nft 丢弃。
       - TS_DEBUG_FIREWALL_MODE=nftables
-      # if/else 总是输出一项：既避免空值渲染 "<no value>"，又避免 environment 为空(解码器要求非空)。
+      # 仅当用户填写时才注入；留空则不设此变量，tailscaled 用内置默认端口（41641）。
+      # environment 不会因此为空——上面的 TS_DEBUG_FIREWALL_MODE 始终存在（解码器要求非空）。
       {{- if .U.ts_tailscaled_extra_args }}
       - TS_TAILSCALED_EXTRA_ARGS={{ .U.ts_tailscaled_extra_args }}
-      {{- else }}
-      - TS_TAILSCALED_EXTRA_ARGS=--port=0
       {{- end }}
     binds:
       - /lzcapp/var/data:/var/lib

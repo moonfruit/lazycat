@@ -20,7 +20,7 @@
 | Tailscale 主机名 | 盒子名 | tailnet 内主机名（`web.sh` 经 `tailscale set` 应用） |
 | 广播子网路由 | （空） | 如 `192.168.50.0/24`，登录后经 `tailscale set --advertise-routes` 广播；需在管理后台批准 |
 | tailscale up 额外参数 | `--accept-routes` | 经 `tailscale set` 应用（如 `--accept-routes` 接收对端子网） |
-| tailscaled 额外参数 | `--port=0` | 传给 tailscaled；`--port=0` 为随机 WireGuard 端口 |
+| tailscaled 额外参数 | （空） | 传给 tailscaled；留空用默认端口 41641，填 `--port=0` 则随机 WireGuard 端口 |
 
 ## 默认能力（已验证）
 
