@@ -14,7 +14,7 @@ application:
       service: gelf
 services:
   seq:
-    image: datalust/seq:2025.2.16202
+    image: datalust/seq:2026.1.17083
     environment:
       - ACCEPT_EULA=Y
       - SEQ_FIRSTRUN_ADMINPASSWORD=password
