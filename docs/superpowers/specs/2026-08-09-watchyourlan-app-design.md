@@ -90,7 +90,7 @@ version: 2.1.4
 name: WatchYourLAN
 description: 轻量级局域网扫描器，持续记录设备上下线历史。
 author: MoonFruit
-license: https://github.com/aceberg/WatchYourLAN/blob/main/LICENSE  # MIT
+license: https://choosealicense.com/licenses/mit/
 homepage: https://github.com/aceberg/WatchYourLAN
 ```
 
