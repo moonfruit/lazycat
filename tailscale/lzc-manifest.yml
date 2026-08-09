@@ -1,6 +1,6 @@
 name: Tailscale
 package: com.github.moonfruit.tailscale
-version: 1.98.10
+version: 1.102.2
 description: 将设备和用户接入你专属的安全虚拟专用网络（官方镜像 + OAuth 登录）。
 
 application:
@@ -19,7 +19,7 @@ services:
   # 直跑 tailscaled（不经 containerboot，避免无 authkey 时的 60s 启动死线）。
   # 仅 tailscaled 自身参数；tailscale CLI 配置交给 web 容器。
   tailscaled:
-    image: tailscale/tailscale:v1.98.10
+    image: tailscale/tailscale:v1.102.2
     network_mode: host
     netadmin: true
     entrypoint: ""
@@ -45,7 +45,7 @@ services:
 
   # tailscale web 登录/管理 UI，并把 hostname/routes/extra 等 CLI 配置应用到共享守护进程。
   web:
-    image: tailscale/tailscale:v1.98.10
+    image: tailscale/tailscale:v1.102.2
     entrypoint: ""
     command: "sh /lzcapp/pkg/content/web.sh"
     environment:
