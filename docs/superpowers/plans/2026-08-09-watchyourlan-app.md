@@ -346,23 +346,46 @@ git commit -m "Add WatchYourLAN version update script"
 
 **前置条件：** 已通过 `lzc-cli` 登录目标盒子。可用 `lzc-cli box` 相关子命令确认当前目标。盒子 SSH 地址 `192.168.50.11`（或 `dkmooncat.heiyu.space`），物理网口 `enp2s0`。
 
+> **`lzc-cli project *` 子命令在这里都用不了。** `project log` / `project exec` / `project start` 面向的是「开发模式项目」，对已安装应用会直接报 `Project app is not running`。`lzc-cli app log` 则返回 `not yet realized`（未实现）。可用的只有 `lzc-cli app status <pkgId>`（返回 `Installed`）。
+>
+> 因此本任务的验证主要在**浏览器**里做，辅以 `ssh 192.168.50.11`。注意 SSH 登录的是**裸机 Debian**，lpk 应用容器不在这一层的 `docker ps` 里（那里只有 13 个 `lzc-*` 系统容器），但 host 网络的监听端口在裸机 `ss -lnt` 中可见。
+
 - [ ] **Step 1: 安装**
 
 Run:
 ```bash
 cd watchyourlan && make install
 ```
-Expected: 安装成功。安装过程中若提示填写"扫描网口 / Network interfaces"，保持默认值 `enp2s0`。
+Expected: 打印「安装成功！」及访问地址 `https://wyl.<盒子名>.heiyu.space`。
 
-- [ ] **Step 2: 验证 arp-scan 没有权限错误**
+**此时应用还没有真正启动**——容器不存在，8840 也没有监听。这是正常的，见 Step 2。
 
-Run:
+- [ ] **Step 2: 在浏览器中完成部署向导**
+
+带部署参数的应用装完后处于「待部署」状态，必须在浏览器里填完参数才会拉起容器。用**已登录懒猫账号的浏览器**打开 `https://wyl.<盒子名>.heiyu.space/`（未认证的 `curl` 只会被重定向到 `/sys/login`，触发不了部署）。
+
+Expected: 出现「懒猫部署向导」页，内容本身就是对 `lzc-deploy-params.yml` 的验证：
+- 字段标题为中文「扫描网口」且带红色 `*` → `locales.zh` 与 `optional: false` 均生效
+- 说明文字是中文版，英文原文没有漏出
+- 输入框已预填 `enp2s0` → `default_value` 生效
+
+保持默认值，点「开始部署」。页面标题变为「WatchYourLAN 启动中」，随后开始拉取镜像。
+
+确认服务已起（**在裸机上查，不是在容器里**）：
 ```bash
-cd watchyourlan && lzc-cli project log
+ssh 192.168.50.11 "ss -lnt | grep 8840"
 ```
-Expected: 日志中**不出现** `Operation not permitted`、`socket: Permission denied`、`arp-scan: pcap_...` 一类错误。
+Expected: 约 1–3 分钟内出现 `LISTEN 0 4096 *:8840 *:*`。
 
-若出现权限错误，说明设计文档 §2 中"NET_RAW 属 Docker 默认 capability"的结论被证伪。修复方式是在 `lzc-build.yml` 末尾追加：
+- [ ] **Step 3: 验证 arp-scan 权限正常**
+
+打开 `https://wyl.<盒子名>.heiyu.space/`，看设备表格。
+
+Expected: 表格中有若干设备，**MAC 列有值**，且 Hardware 列能解析出厂商（如 `Apple, Inc...`、`Beijing Xiao..`）。
+
+这比翻日志更直接：能收发原始 ARP 帧才可能拿到 MAC 和厂商，所以有数据就等于 `CAP_NET_RAW` 到位，设计文档 §2 的结论成立。（日志路径在这里不可用，见本任务开头的说明。）
+
+若表格**空白或只有 IP 没有 MAC**，说明 §2 的结论被证伪。修复方式是在 `lzc-build.yml` 末尾追加：
 
 ```yaml
 compose_override:
@@ -374,57 +397,56 @@ compose_override:
 
 然后 `make clean && make install` 重来，并在设计文档 §2 记下这一结论已被推翻。
 
-- [ ] **Step 3: 验证 Web UI 路由通**
+- [ ] **Step 4: 验证 Web UI 路由通**
 
-浏览器打开 `https://wyl.<盒子名>.heiyu.space`（本机为 `https://wyl.dkmooncat.heiyu.space`）。
+Step 2/3 里页面能正常打开，这一步其实已经过了。这里只记录失败时的分诊路径。
 
-Expected: WatchYourLAN 界面正常加载（含设备表格与顶部导航），不是 502 / 白屏。
+Expected: WatchYourLAN 界面正常加载（顶部 Home / Config / History 导航 + 设备表格），不是 502 / 白屏。
 
-若是 502，说明 `host.lzcapp:8840` 这条路走不通。先在盒子上确认服务确实在监听：
+若是 502，先在盒子上确认服务确实在监听：
 
 ```bash
-ssh 192.168.50.11 "ss -lntp | grep 8840"
+ssh 192.168.50.11 "ss -lnt | grep 8840"
 ```
 - 若 8840 **有**监听 → 问题在 `host.lzcapp` 解析，改用设计文档 §3 的兜底方案（加一个桥接网络的反代容器转发到盒子 IP:8840）。
-- 若 8840 **无**监听 → 问题在容器本身，回 Step 2 看日志。
+- 若 8840 **无**监听 → 容器没起来，回 Step 2 确认部署向导是否真的提交成功。
 
-- [ ] **Step 4: 验证 `IFACES` 生效**
+- [ ] **Step 5: 验证 `IFACES` 生效**
 
-在 Web UI 的设备列表中查看已发现主机的 IP。
+在 Web UI 的设备列表中查看 Iface 列与 IP 列。
 
-Expected: 全部落在 `192.168.50.0/24` 网段，**没有** `172.28.x.x`、`172.18.x.x` 这类懒猫/docker 网桥地址。若出现网桥地址，说明 `IFACES` 未被正确注入——在盒子上确认容器实际拿到的环境变量：
+Expected: Iface 列全部是 `enp2s0`；IP 全部落在 `192.168.50.0/24`，**没有** `172.28.x.x`、`172.18.x.x` 这类懒猫/docker 网桥地址。网关 `192.168.50.1` 会被标注为 `_gateway`。
 
-```bash
-cd watchyourlan && lzc-cli project exec sh -c 'echo "IFACES=[$IFACES]"'
-```
-Expected: `IFACES=[enp2s0]`。若是 `IFACES=[{{ .U.ifaces }}]` 或空，说明部署参数模板未渲染，检查 `lzc-deploy-params.yml` 的 `id` 是否与 manifest 里的 `.U.ifaces` 完全一致。
+若出现网桥地址，说明 `IFACES` 没被正确注入。检查 `lzc-deploy-params.yml` 的 `id` 是否与 manifest 里的 `.U.ifaces` 完全一致，以及部署向导里填的值。（`lzc-cli project exec` 在已安装应用上不可用，查不了容器内的环境变量。）
 
-（`lzc-cli project exec` 的参数形式若报错，先看 `lzc-cli project exec --help`；退路是 `ssh 192.168.50.11` 后用 `docker inspect` 查该容器的 `Config.Env`。）
+- [ ] **Step 6: 验证数据持久化**
 
-- [ ] **Step 5: 验证数据持久化**
-
-先在 UI 上确认已有若干条设备记录（记下其中一台的 MAC，便于比对），然后**重启**应用——在懒猫管理界面停止再启动，或执行：
+用**同版本覆盖安装**来重建容器——`lzc-cli` 没有 restart 类命令，而覆盖安装正是日常升级会发生的事，比单纯重启更有说服力：
 
 ```bash
-cd watchyourlan && lzc-cli project start
+# 先记录基线：设备条数，以及最早那几条记录的时间戳
+cd watchyourlan && make install
 ```
 
-> **不要用卸载重装来做这一步。** `make uninstall` 会清空 `/lzcapp/var/data`，那样验证的就不是持久化而是初始化了，且已积累的历史记录会永久丢失。
+等约 10 秒后刷新 Web UI，对比表格。
 
-重启后刷新 Web UI。
+Expected:
+- 设备条数持平或略增（扫描期间可能新发现设备），**顺序不变**。
+- 关键判据：**有若干条记录的时间戳仍早于本次覆盖安装的时刻**。这些是重装前扫描留下的，能活过容器重建就证明 `/lzcapp/var/data:/data/WatchYourLAN` 绑定生效、sqlite 落盘正常。
+- 若所有时间戳都晚于覆盖安装时刻、且顺序重排，说明数据被清空了，绑定有问题。
 
-Expected: 之前的设备记录与历史仍在，说明 `/lzcapp/var/data:/data/WatchYourLAN` 绑定生效、sqlite 落盘正常。
+> **不要用 `make uninstall` 再装来做这一步。** 卸载会清空 `/lzcapp/var/data`，那样验证的就不是持久化而是初始化，且已积累的历史会永久丢失。
 
-- [ ] **Step 6: 记录验证结果**
+- [ ] **Step 7: 记录验证结果**
 
-若 Step 2 / 3 触发了任何兜底方案，把实际结论回写进 `docs/superpowers/specs/2026-08-09-watchyourlan-app-design.md` 的对应章节（§2 权限结论、§3 路由方案），并连同代码改动一起提交：
+若前面任何一步触发了兜底方案，把实际结论回写进 `docs/superpowers/specs/2026-08-09-watchyourlan-app-design.md` 的对应章节（§2 权限结论、§3 路由方案），并连同代码改动一起提交：
 
 ```bash
 git add -A watchyourlan docs/superpowers/specs/2026-08-09-watchyourlan-app-design.md
 git commit -m "Fix WatchYourLAN deployment issues found in box testing"
 ```
 
-若六步全部一次通过，无需额外提交——Task 1、2 的提交即为最终产物。
+若各步一次通过，无需额外提交——Task 1、2 的提交即为最终产物。
 
 ---
 
@@ -432,7 +454,7 @@ git commit -m "Fix WatchYourLAN deployment issues found in box testing"
 
 - [ ] `watchyourlan/` 下有 7 个文件：`package.yml`、`lzc-manifest.yml`、`lzc-deploy-params.yml`、`lzc-build.yml`、`lzc-icon.png`、`Makefile`、`update.sh`
 - [ ] `lzc-manifest.yml` 中**不含** `background_task`、`public_path`、`ingress`、`netadmin`
-- [ ] `lzc-build.yml` 中**不含** `contentdir`、`buildscript`（除非 Task 3 Step 2 触发了 `compose_override`）
+- [ ] `lzc-build.yml` 中**不含** `contentdir`、`buildscript`（除非 Task 3 Step 3 触发了 `compose_override`）
 - [ ] `make` 能产出 `app.lpk`，`git status` 中不出现 `app.lpk`
 - [ ] `yq .package package.yml` 返回 `com.github.moonfruit.watchyourlan`
 - [ ] `./update.sh` 运行后工作区无差异（已是最新版）

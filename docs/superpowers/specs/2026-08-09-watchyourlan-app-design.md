@@ -139,11 +139,14 @@ services:
 
 **待实现时验证**：Docker Hub 上该镜像除语义版本外还有 `latest` / `v2` / `dev` 三个非语义 tag，需确认 `find-image-latest-version` 能正确过滤并返回 `2.1.4`。
 
-## 6. 验证方式
+## 6. 验证方式与实测结果
 
-1. `make` 构建出 `app.lpk`，`make install` 安装到盒子。
-2. 浏览器打开 `wyl.<box>.heiyu.space`，确认 `host.lzcapp:8840` 路由通、界面加载正常。
-3. `lzc-cli project log` 确认 `arp-scan` 无 `Operation not permitted` 一类权限错误——若有，说明 §2 的 NET_RAW 结论被证伪，需补 `compose_override` 的 `cap_add: [NET_RAW]`。
-4. 界面上确认扫出的是 `192.168.50.0/24` 的真实设备，而非 `172.28.x` 网桥地址——验证 `IFACES=enp2s0` 生效。
-5. 重启应用后确认 `/lzcapp/var/data` 下的 sqlite 数据与历史记录仍在。
-6. `./update.sh` 干跑一次，确认版本探测与 `sed` 替换正确。
+> **注意：`lzc-cli project *` 子命令对已安装应用都不可用**（`project log` / `exec` / `start` 均报 `Project app is not running`，它们面向的是开发模式项目）；`lzc-cli app log` 返回 `not yet realized`。可用的只有 `lzc-cli app status <pkgId>`。因此验证以浏览器为主、`ssh 192.168.50.11` 为辅。SSH 登录的是裸机 Debian，应用容器不在该层的 `docker ps` 里，但 host 网络的监听端口在裸机 `ss -lnt` 中可见。
+
+1. `make` 构建出 `app.lpk`，`make install` 安装到盒子。**✔ 通过**
+2. 安装完成后应用处于「待部署」状态（容器不存在、8840 无监听），需用已登录的浏览器打开入口完成**部署向导**才会拉起容器。未认证的 `curl` 只会被重定向到 `/sys/login`，触发不了部署。**✔ 通过**——向导页正确显示中文「扫描网口」、红色必填星号、预填 `enp2s0`，证明 `locales.zh`、`optional: false`、`default_value` 三项均生效。
+3. 浏览器打开 `wyl.<box>.heiyu.space`，确认 `host.lzcapp:8840` 路由通、界面加载正常。**✔ 通过**——§3 的 `host.lzcapp` 方案成立，未动用兜底方案。
+4. 确认 `arp-scan` 权限：设备表格中 MAC 列有值、Hardware 列能解析出厂商。这比翻日志更直接——能拿到 MAC 就说明原始 ARP 帧收发正常。**✔ 通过**（扫出 41 台设备，厂商解析出 Apple / Beijing Xiaomi / Lumi United / Qingping 等）。**§2 的「NET_RAW 属 Docker 默认 capability、无需显式授予」结论成立，未添加 `compose_override`。**
+5. 界面上确认扫出的是 `192.168.50.0/24` 的真实设备，而非 `172.28.x` 网桥地址——验证 `IFACES=enp2s0` 生效。**✔ 通过**（Iface 列全为 `enp2s0`，无一条网桥地址，网关 `192.168.50.1` 标注为 `_gateway`）。时间戳为北京时间，`TZ=Asia/Shanghai` 亦正确。
+6. 数据持久化：用同版本 `make install` 覆盖安装重建容器（`lzc-cli` 无 restart 类命令），确认部分记录的时间戳仍早于覆盖安装时刻。**✔ 通过**（41 → 42 条，顺序不变，多条记录保留着重装前的时间戳）。
+7. `./update.sh` 干跑一次，确认版本探测与 `sed` 替换正确。**✔ 通过**（探测到 `2.1.4`，替换后工作区与 HEAD 零差异，证明替换串与原文逐字节一致）。
