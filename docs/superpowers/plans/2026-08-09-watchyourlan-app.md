@@ -283,8 +283,12 @@ chmod +x watchyourlan/update.sh
 Run:
 ```bash
 cd watchyourlan && ./update.sh
+grep -H '^version:' package.yml
+grep -H 'image:' lzc-manifest.yml
 ```
-Expected: 打印 `Using version: 2.1.4`，随后打印一段 `git diff`，显示 `version: 0.0.0` → `version: 2.1.4` 与 `...watchyourlan:0.0.0` → `...watchyourlan:2.1.4` 两处变更。
+Expected: 脚本打印 `Using version: 2.1.4`；两处 `grep` 分别显示 `version: 2.1.4` 和 `image: aceberg/watchyourlan:2.1.4`。
+
+脚本**不会**打印 `git diff` 段——这是对的，不是 bug：脚本把版本改回的正是 Task 1 已提交的 `2.1.4`，此时工作区与 HEAD 一致，`git diff --quiet` 返回 0。diff 只在上游真的发了新版时才会打印。
 
 - [ ] **Step 4: 确认工作区已回到 Task 1 的干净状态**
 
@@ -294,13 +298,24 @@ cd watchyourlan && git diff --stat package.yml lzc-manifest.yml
 ```
 Expected: **空输出**——两个文件已被脚本改回与 Task 1 提交内容完全一致。若非空，说明 `sed` 替换出的字符串与原文有出入（例如缩进或空格差异），修正 `sed` 表达式后重跑 Step 1–4。
 
-- [ ] **Step 5: 确认幂等与 `-N` 分支**
+- [ ] **Step 5: 验证 diff 打印分支与 `-N` 分支**
 
-Run:
+Step 3/4 之后工作区无差异，走不到 diff 打印分支。用一处无关改动把两个分支都逼出来（可逆）：
+
 ```bash
-cd watchyourlan && ./update.sh -N
+cd watchyourlan
+sed -e 's/^description:.*/description: TEMP-验证diff分支/' -i package.yml
+./update.sh        # 不带 -N
+./update.sh -N     # 带 -N
+git checkout -- package.yml
+git diff --stat    # 确认已恢复
 ```
-Expected: 打印 `Using version: 2.1.4`，**不打印** `git diff` 段（因为传了 `-N`，且此时本来也无差异）。
+Expected:
+- 第一次（不带 `-N`）打印 ` --- === Result === ---` 及 `description` 那一行的 diff。
+- 第二次（带 `-N`）只打印 `Using version: 2.1.4`，**不打印** diff 段。
+- `git checkout` 后 `git diff --stat` 空输出，`description` 恢复原文。
+
+这一步验证的是脚本的输出分支，与版本号无关——`description` 只是个便于观察的可逆改动。
 
 - [ ] **Step 6: 确认仓库根脚本能发现它**
 
