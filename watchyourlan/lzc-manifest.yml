@@ -1,0 +1,19 @@
+application:
+  subdomain: wyl
+  # host 网络的容器不在应用私有网桥上，短名（http://wyl/）解析不到；
+  # host.lzcapp 是访问盒子宿主端口的写法（同 vuetorrent 的 QBIT_BASE）。
+  routes:
+    - /=http://host.lzcapp:8840/
+
+services:
+  wyl:
+    image: aceberg/watchyourlan:2.1.4
+    # 上游硬性要求：ARP 扫描必须直连物理网段，桥接网络里只看得到 docker 网桥。
+    network_mode: host
+    # 只设这两项。TIMEOUT/THEME/COLOR 交给 WatchYourLAN 的 Settings 页面管理，
+    # 它会落盘到 config.yaml；写进 manifest 会在每次容器重启时覆盖用户的设置。
+    environment:
+      - TZ=Asia/Shanghai
+      - IFACES={{ .U.ifaces }}
+    binds:
+      - /lzcapp/var/data:/data/WatchYourLAN

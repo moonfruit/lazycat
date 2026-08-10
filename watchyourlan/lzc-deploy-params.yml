@@ -1,0 +1,13 @@
+params:
+  - id: ifaces
+    type: string
+    name: Network interfaces
+    default_value: "enp2s0"
+    description: "Space-separated physical interface names to scan, e.g. `enp2s0` or `enp2s0 wlp4s0`. Keep this pointed at a real NIC: when empty, WatchYourLAN auto-detects and scans every interface on the box, including the docker and LazyCat bridges (lzc-br-*, veth*, br-*), filling the database with meaningless 172.28.x entries. Run `ip -br addr` on the box to list yours."
+    optional: false
+
+locales:
+  zh:
+    ifaces:
+      name: "扫描网口"
+      description: "以空格分隔的物理网口名，如 `enp2s0` 或 `enp2s0 wlp4s0`。必须填真实网口：留空时 WatchYourLAN 会自动探测并扫描全部接口，把盒子上的 docker 与懒猫网桥（lzc-br-*、veth*、br-*）一起扫进去，数据库里会塞满无意义的 172.28.x 记录。在盒子上执行 `ip -br addr` 可查看本机网口。"

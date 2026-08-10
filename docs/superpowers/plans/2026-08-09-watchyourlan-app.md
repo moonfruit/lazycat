@@ -189,12 +189,15 @@ Expected: 生成 `app.lpk`，非空。
 
 再确认打进包里的 manifest 保留了模板占位符（**没有**在构建期被误渲染成空串）：
 
-```bash
-cd watchyourlan && unzip -p app.lpk manifest.yml | grep -E 'IFACES|host\.lzcapp|image:'
-```
-Expected: 输出中含 `- IFACES={{ .U.ifaces }}`、`- /=http://host.lzcapp:8840/`、`image: aceberg/watchyourlan:2.1.4`。
+lpk v2 的产物是 **POSIX tar**（不是 zip，`unzip` 读不了），内含 `manifest.yml` / `package.yml` / `deploy_params.yml` / `icon.png` 四个文件：
 
-若 `unzip -p` 报格式错误，改用 `lzc-cli lpk` 的解包子命令查看（`lzc-cli lpk --help` 查具体用法）；关键是确认 `{{ .U.ifaces }}` 原样保留。
+```bash
+cd watchyourlan && tar -tvf app.lpk
+tar -xOf app.lpk manifest.yml | grep -E 'IFACES|host\.lzcapp|image:'
+```
+Expected: `tar -tvf` 列出上述四个文件；`grep` 输出中含 `- IFACES={{ .U.ifaces }}`、`- /=http://host.lzcapp:8840/`、`image: aceberg/watchyourlan:2.1.4`。
+
+关键是确认 `{{ .U.ifaces }}` **原样保留**——它必须由盒子在安装时渲染，构建期渲染成空串就说明配置错了。`deploy_params.yml` 由 `lzc-cli` 从 `lzc-deploy-params.yml` 自动发现并打包，无需在 `lzc-build.yml` 里声明。
 
 - [ ] **Step 10: 校验 uninstall 目标能取到包名**
 
