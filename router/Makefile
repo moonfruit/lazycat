@@ -10,7 +10,7 @@ install: app.lpk
 	lzc-cli app install app.lpk
 
 uninstall:
-	lzc-cli app uninstall `yq .package lzc-manifest.yml`
+	lzc-cli app uninstall `yq .package package.yml`
 
 update:
 	@./update.sh
