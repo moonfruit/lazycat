@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#F0B429"/>
+  <g fill="none" stroke="#1A1A1A" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 把手 -->
+    <path d="M204 96 V78 a20 20 0 0 1 20-20 h64 a20 20 0 0 1 20 20 V96"/>
+    <!-- 盖子 -->
+    <rect x="88" y="96" width="336" height="48" rx="14"/>
+    <!-- 桶身 -->
+    <path d="M108 156 L124 452 a20 20 0 0 0 20 19 h224 a20 20 0 0 0 20-19 L404 156"/>
+  </g>
+  <g fill="#1A1A1A" transform="translate(256 317) scale(0.88) translate(-256 -317)">
+    <!-- 行1: h -->
+    <rect x="165" y="184" width="26" height="102"/>
+    <rect x="165" y="206" width="90" height="26"/>
+    <rect x="229" y="206" width="26" height="80"/>
+    <!-- 行1: t -->
+    <rect x="296" y="184" width="26" height="102"/>
+    <rect x="271" y="206" width="76" height="26"/>
+    <!-- 行2: t -->
+    <rect x="190" y="318" width="26" height="102"/>
+    <rect x="165" y="340" width="76" height="26"/>
+    <!-- 行2: p -->
+    <rect x="257" y="340" width="26" height="110"/>
+    <rect x="257" y="340" width="90" height="26"/>
+    <rect x="321" y="340" width="26" height="80"/>
+    <rect x="257" y="394" width="90" height="26"/>
+  </g>
+</svg>
