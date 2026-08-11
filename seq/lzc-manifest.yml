@@ -1,8 +1,12 @@
 application:
   subdomain: seq
+  oidc_redirect_path: /oidc/callback
   upstreams:
+    # 以 https 回源（自签证书，由 seqinit 生成），Seq 才会生成
+    # https 且不带端口的 OIDC redirect_uri，与懒猫注册的回调地址一致
     - location: /
-      backend: http://seq/
+      backend: https://seq/
+      disable_backend_ssl_verify: true
   ingress:
     - protocol: tcp
       port: 5341
@@ -17,9 +21,15 @@ services:
     image: datalust/seq:2026.1.17083
     environment:
       - ACCEPT_EULA=Y
-      - SEQ_FIRSTRUN_ADMINPASSWORD=password
+      - SEQ_FIRSTRUN_NOAUTHENTICATION=true
+      - LAZYCAT_AUTH_OIDC_CLIENT_ID=${LAZYCAT_AUTH_OIDC_CLIENT_ID}
+      - LAZYCAT_AUTH_OIDC_CLIENT_SECRET=${LAZYCAT_AUTH_OIDC_CLIENT_SECRET}
+      - LAZYCAT_AUTH_OIDC_ISSUER_URI=${LAZYCAT_AUTH_OIDC_ISSUER_URI}
     binds:
       - /lzcapp/var/data:/data
+      - /lzcapp/pkg/content/seq:/pkg
+      - /lzcapp/pkg/content/seqinit:/seqinit
+    setup_script: /pkg/setup.sh
   gelf:
     image: datalust/seq-input-gelf:4.0.02323
     depends_on:
