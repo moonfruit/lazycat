@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "lazycat-advanced-routing": {
+      "source": "whoamihappyhacking/lazycat-skills",
+      "sourceType": "github",
+      "skillPath": "skills/lazycat-advanced-routing/SKILL.md",
+      "computedHash": "68f66f4571f08cb487b6414426a4a5188f87b75dbf4643eee315d55609c00043"
+    },
+    "lazycat-aipod-developer": {
+      "source": "whoamihappyhacking/lazycat-skills",
+      "sourceType": "github",
+      "skillPath": "skills/lazycat-aipod-developer/SKILL.md",
+      "computedHash": "fef78bf1e645843ae948ca76fb4d51095f8b15c5386715ffe22eb7ab7b633f0f"
+    },
+    "lazycat-auth-integration": {
+      "source": "whoamihappyhacking/lazycat-skills",
+      "sourceType": "github",
+      "skillPath": "skills/lazycat-auth-integration/SKILL.md",
+      "computedHash": "9e69e815a795b438dda0e1f64b6415367447ebb01c97bcd49e77dd90f24788b8"
+    },
+    "lazycat-developer-expert": {
+      "source": "whoamihappyhacking/lazycat-skills",
+      "sourceType": "github",
+      "skillPath": "skills/lazycat-developer-expert/SKILL.md",
+      "computedHash": "d6d3099cf5c41e0fdf07a65c913a3f5402c5ecba9f8aaf68797ade4baf1d59a7"
+    },
+    "lazycat-dynamic-deploy": {
+      "source": "whoamihappyhacking/lazycat-skills",
+      "sourceType": "github",
+      "skillPath": "skills/lazycat-dynamic-deploy/SKILL.md",
+      "computedHash": "cd42c9f0b8a0f9040d4bbdded43ba56b2428787a13057cd3099261aa32d7af2e"
+    },
+    "lazycat-lpk-builder": {
+      "source": "whoamihappyhacking/lazycat-skills",
+      "sourceType": "github",
+      "skillPath": "skills/lazycat-lpk-builder/SKILL.md",
+      "computedHash": "000992ec9a8077ea11c9112c1ab5d945e1c5c7124b3479d92a6a5ece72c89570"
+    }
+  }
+}
