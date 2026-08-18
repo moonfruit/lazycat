@@ -1,12 +1,8 @@
-name: 算力舱
-package: com.github.moonfruit.aipod
-version: 1.0.0
 application:
   subdomain: aipod
   upstreams:
     - location: /
       backend_launch_command: /lzcapp/pkg/content/netmap -target=192.168.50.12 -port=33 -udp-port=34
-      # backend: file:///lzcapp/pkg/content/web
       backend: http://192.168.50.12:8080/
     - location: /
       domain_prefix: dockge

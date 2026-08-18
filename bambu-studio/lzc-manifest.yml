@@ -14,7 +14,7 @@ application:
       disable_backend_ssl_verify: true
 services:
   studio:
-    image: lscr.io/linuxserver/bambustudio:v02.08.01.55-ls161
+    image: lscr.io/linuxserver/bambustudio:v02.08.02.60-ls164
     environment:
       - PUID=0
       - PGID=0
