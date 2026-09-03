@@ -18,7 +18,7 @@ application:
       service: gelf
 services:
   seq:
-    image: datalust/seq:2026.1.17083
+    image: datalust/seq:2026.1.17114
     environment:
       - ACCEPT_EULA=Y
       - SEQ_FIRSTRUN_NOAUTHENTICATION=true

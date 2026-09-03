@@ -6,7 +6,7 @@ application:
     - /=http://vue/
 services:
   qbit:
-    image: lscr.io/linuxserver/qbittorrent:5.2.3_v2.0.14-ls472
+    image: lscr.io/linuxserver/qbittorrent:5.2.3_v2.0.14-ls474
     environment:
       - PUID=0
       - PGID=0
