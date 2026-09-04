@@ -19,6 +19,10 @@ application:
 services:
   seq:
     image: datalust/seq:2026.1.17114
+    # 包一层 run.sh：Seq 只在进程启动时读一次 OIDC 配置，而懒猫每次升级都会轮换
+    # client_secret，故须在拉起正式实例之前写好设置（详见脚本内注释）
+    entrypoint: ""
+    command: bash /pkg/run.sh
     environment:
       - ACCEPT_EULA=Y
       - SEQ_FIRSTRUN_NOAUTHENTICATION=true
@@ -29,7 +33,6 @@ services:
       - /lzcapp/var/data:/data
       - /lzcapp/pkg/content/seq:/pkg
       - /lzcapp/pkg/content/seqinit:/seqinit
-    setup_script: /pkg/setup.sh
   gelf:
     image: datalust/seq-input-gelf:4.0.02323
     depends_on:

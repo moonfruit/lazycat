@@ -1,5 +1,5 @@
 package: com.github.moonfruit.seq
-version: 2026.1.17083
+version: 2026.1.17114
 name: Seq
 description: The self-hosted search, analysis, and alerting server built for modern structured log data.
 author: MoonFruit
