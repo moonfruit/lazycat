@@ -1,6 +1,6 @@
 module netmap
 
-go 1.25.5
+go 1.26.0
 
 require gitee.com/linakesi/remotesocks v0.0.0-20260420090949-a44f3e4f0ad6
 
@@ -10,6 +10,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
-	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 )

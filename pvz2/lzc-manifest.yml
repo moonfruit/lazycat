@@ -7,4 +7,4 @@ application:
     - /
 services:
   pvz2:
-    image: gaozih/pvzge:v0.12.1
+    image: gaozih/pvzge@sha256:5df17f8286e0591ae8bf9578ed8fa5252f35dadc457c9c51fadfeade8db5f3b1

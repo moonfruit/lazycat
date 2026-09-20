@@ -1,5 +1,5 @@
 package: com.github.moonfruit.pvz2
-version: 0.8.2
+version: 0.14.0
 name: PvZ2 Gardendless
 description: A rewritten "Plants vs Zombies 2" entirely using only Web technologies
 author: MoonFruit
