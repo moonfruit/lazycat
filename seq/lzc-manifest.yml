@@ -18,7 +18,7 @@ application:
       service: gelf
 services:
   seq:
-    image: datalust/seq:2026.1.17114
+    image: datalust/seq:2026.1.17182
     # 包一层 run.sh：Seq 只在进程启动时读一次 OIDC 配置，而懒猫每次升级都会轮换
     # client_secret，故须在拉起正式实例之前写好设置（详见脚本内注释）
     entrypoint: ""
