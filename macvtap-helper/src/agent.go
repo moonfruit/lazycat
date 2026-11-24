@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -16,25 +17,38 @@ type RealActions struct {
 	Pkgm *Pkgm
 }
 
-func (r *RealActions) MacvtapLoaded() bool { return MacvtapLoadedFromProc() }
+func (r *RealActions) MacvtapLoaded() bool {
+	_, err := hostMacvtapMajor()
+	return err == nil
+}
 
 // LightosRunning 经 7733 instance/status 判断 lightos 实例是否处于运行态（实测码=6）。
-// 查询失败按"未运行"处理（保守：宁可尝试启动）。
-func (r *RealActions) LightosRunning() bool {
+func (r *RealActions) LightosRunning() (bool, error) {
 	st, err := r.Pkgm.Status(instanceID)
+	return st == statusRunning, err
+}
+
+func (r *RealActions) DebianAllowsMacvtap() (bool, error) {
+	major, err := hostMacvtapMajor()
 	if err != nil {
-		log.Printf("LightosRunning status check failed: %v", err)
-		return false
+		return false, err
 	}
-	return st == statusRunning
+	f, err := os.Open("/run/lightos-runc/" + debianID + "/state.json")
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	return debianAllowsMacvtap(f, major)
+}
+
+func (r *RealActions) StartLightos() error {
+	log.Print("requesting LightOS resume")
+	return r.Pkgm.Resume(instanceID, instanceUID)
 }
 
 // LoadMacvtap 在 enp2s0 上建一个临时 macvtap 接口再删除，触发内核加载 macvtap 模块。
 // 不需要 CAP_SYS_MODULE：内核在 RTM_NEWLINK(kind=macvtap) 时自动 request_module。
 func (r *RealActions) LoadMacvtap() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	parent, err := netlink.LinkByName(parentIf)
 	if err != nil {
 		return fmt.Errorf("find parent %s: %w", parentIf, err)
@@ -55,7 +69,7 @@ func (r *RealActions) LoadMacvtap() error {
 		_ = netlink.LinkDel(l)
 	}
 	for i := 0; i < 50; i++ {
-		if MacvtapLoadedFromProc() {
+		if r.MacvtapLoaded() {
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -65,9 +79,6 @@ func (r *RealActions) LoadMacvtap() error {
 
 // RestartLightos 重启 lightos 实例：pause(忽略错误)+resume(忽略400，阻塞至启动完成)。
 func (r *RealActions) RestartLightos() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if err := r.Pkgm.Pause(instanceID, instanceUID); err != nil {
 		log.Printf("pause (ignored): %v", err)
 	}
@@ -97,13 +108,29 @@ func RunAgent() {
 				log.Printf("status error: %v", err)
 				return Response{OK: false, MacvtapLoaded: acts.MacvtapLoaded(), InstanceStatus: 0, Message: "status error: " + err.Error()}
 			}
-			return Response{OK: true, MacvtapLoaded: acts.MacvtapLoaded(), InstanceStatus: st, Message: "ok"}
+			resp := Response{OK: true, MacvtapLoaded: acts.MacvtapLoaded(), InstanceStatus: st, Message: "等待 LightOS 和 macvtap 就绪"}
+			if st == statusRunning && resp.MacvtapLoaded {
+				allowed, err := acts.DebianAllowsMacvtap()
+				switch {
+				case err != nil:
+					resp.Message = "暂时无法读取 Debian 设备规则：" + err.Error()
+				case allowed:
+					resp.Message = "Debian 已允许读写 macvtap"
+				default:
+					resp.Message = "Debian 缺少 macvtap 读写权限"
+				}
+			}
+			return resp
 		case "load-macvtap":
+			acts.mu.Lock()
+			defer acts.mu.Unlock()
 			if err := acts.LoadMacvtap(); err != nil {
 				return Response{OK: false, MacvtapLoaded: acts.MacvtapLoaded(), Message: err.Error()}
 			}
 			return Response{OK: true, MacvtapLoaded: true, Message: "macvtap loaded"}
 		case "restart-lightos":
+			acts.mu.Lock()
+			defer acts.mu.Unlock()
 			if err := acts.RestartLightos(); err != nil {
 				return Response{OK: false, Message: err.Error()}
 			}
@@ -122,10 +149,26 @@ func RunAgent() {
 	// 先开 socket 让应用快速就绪（healthcheck 通过 → "运行中"），再后台自愈，
 	// 避免应用长时间卡在"启动中"。
 	go func() {
-		if started, err := BootHeal(acts); err != nil {
-			log.Printf("boot BootHeal error: %v", err)
-		} else {
-			log.Printf("boot BootHeal ok: started=%v", started)
+		var boot bootRecovery
+		deadline := time.Now().Add(5 * time.Minute)
+		var previous string
+		for {
+			acts.mu.Lock()
+			err := boot.check(acts)
+			acts.mu.Unlock()
+			if err == nil {
+				log.Printf("Debian allows macvtap read/write (resume requested=%t, restart requested=%t)", boot.startRequested, boot.restartRequested)
+				return
+			}
+			if time.Now().After(deadline) {
+				log.Printf("boot recovery timed out: %v", err)
+				return
+			}
+			if err.Error() != previous {
+				log.Printf("boot recovery: %v", err)
+				previous = err.Error()
+			}
+			time.Sleep(5 * time.Second)
 		}
 	}()
 

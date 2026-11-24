@@ -34,7 +34,8 @@ case "$cmd" in
     ip link set "$HAOS_TAP_IF" up
 
     # 4. Wait for /dev/tap<ifindex> to appear (udev)
-    IFINDEX=$(cat "/sys/class/net/$HAOS_TAP_IF/ifindex")
+    # LightOS bind-mounts the host's /sys/devices. Query the instance's network namespace.
+    IFINDEX=$(ip -o link show dev "$HAOS_TAP_IF" | cut -d: -f1)
     DEV="/dev/tap$IFINDEX"
     for _ in $(seq 1 50); do
       [[ -c "$DEV" ]] && break

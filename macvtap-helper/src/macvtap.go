@@ -1,30 +1,37 @@
 package main
 
 import (
-	"bufio"
+	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
-// MacvtapLoaded 解析 /proc/devices 文本，判断字符设备表里是否存在名为 "macvtap" 的设备
-// （即 macvtap 内核模块已加载、major 已注册）。
-func MacvtapLoaded(procDevices string) bool {
-	sc := bufio.NewScanner(strings.NewReader(procDevices))
-	for sc.Scan() {
-		fields := strings.Fields(sc.Text())
-		// 形如 "238 macvtap"：两列，第二列精确等于 macvtap
-		if len(fields) == 2 && fields[1] == "macvtap" {
-			return true
+func macvtapMajor(devices string) (int, error) {
+	var characters bool
+	for line := range strings.SplitSeq(devices, "\n") {
+		switch strings.TrimSpace(line) {
+		case "Character devices:":
+			characters = true
+		case "Block devices:":
+			characters = false
+		}
+		fields := strings.Fields(line)
+		if characters && len(fields) == 2 && fields[1] == "macvtap" {
+			major, err := strconv.Atoi(fields[0])
+			if err == nil && major > 0 {
+				return major, nil
+			}
+			return 0, fmt.Errorf("invalid macvtap major %q", fields[0])
 		}
 	}
-	return false
+	return 0, fmt.Errorf("macvtap character device not registered")
 }
 
-// MacvtapLoadedFromProc 读取宿主 /proc/devices 后判断。
-func MacvtapLoadedFromProc() bool {
+func hostMacvtapMajor() (int, error) {
 	b, err := os.ReadFile("/proc/devices")
 	if err != nil {
-		return false
+		return 0, err
 	}
-	return MacvtapLoaded(string(b))
+	return macvtapMajor(string(b))
 }

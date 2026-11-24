@@ -33,12 +33,15 @@ func (p *Pkgm) Status(id string) (int, error) {
 		return 0, fmt.Errorf("status http %d: %s", resp.StatusCode, body)
 	}
 	var out struct {
-		Status int `json:"status"`
+		Status *int `json:"status"`
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
 		return 0, fmt.Errorf("decode status: %w", err)
 	}
-	return out.Status, nil
+	if out.Status == nil {
+		return 0, fmt.Errorf("instance status missing from pkgm response")
+	}
+	return *out.Status, nil
 }
 
 func (p *Pkgm) post(action, id, uid string) (int, []byte, error) {

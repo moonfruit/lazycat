@@ -21,6 +21,17 @@ func TestPkgmStatus(t *testing.T) {
 	}
 }
 
+func TestPkgmMissingStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	p := &Pkgm{Base: srv.URL, HTTP: srv.Client()}
+	if _, err := p.Status("x"); err == nil {
+		t.Fatal("missing status must not be treated as a stopped instance")
+	}
+}
+
 func TestPkgmResumeIgnores400(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/api/app/instance/resume" {

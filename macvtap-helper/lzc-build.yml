@@ -3,3 +3,8 @@ manifest: ./lzc-manifest.yml
 contentdir: ./dist
 pkgout: ./
 icon: ./lzc-icon.png
+compose_override:
+  services:
+    agent:
+      volumes:
+        - /lzcsys/run/lightos/.runc:/run/lightos-runc:ro

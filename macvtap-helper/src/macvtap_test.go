@@ -13,12 +13,14 @@ func TestMacvtapLoaded(t *testing.T) {
 		{"present", withMacvtap, true},
 		{"absent", withoutMacvtap, false},
 		{"empty", "", false},
+		{"block device", "Block devices:\n238 macvtap\n", false},
 		// 不能被 "macvtap" 子串误伤其它名字
 		{"substring-safe", "Character devices:\n 60 macvtapx\n", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := MacvtapLoaded(c.in); got != c.want {
+			_, err := macvtapMajor(c.in)
+			if got := err == nil; got != c.want {
 				t.Fatalf("MacvtapLoaded(%q)=%v want %v", c.name, got, c.want)
 			}
 		})

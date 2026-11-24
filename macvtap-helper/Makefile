@@ -1,6 +1,6 @@
 all: app.lpk
 
-app.lpk: lzc-* src/*
+app.lpk: lzc-* package.yml src/*
 	lzc-cli project build -o app.lpk
 
 clean:
