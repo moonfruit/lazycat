@@ -12,5 +12,8 @@ install: app.lpk
 uninstall:
 	lzc-cli app uninstall `yq .package package.yml`
 
+install-all: install
+	make -C ../aipod install
+
 update:
 	@./update.sh
