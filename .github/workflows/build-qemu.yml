@@ -1,12 +1,12 @@
-name: Build image for haos-qemu
+name: Build image for qemu
 
 on:
   push:
     branches:
       - main
     paths:
-      - ".github/workflows/build-haos-qemu.yml"
-      - "docker/haos-qemu/Dockerfile"
+      - ".github/workflows/build-qemu.yml"
+      - "docker/qemu/Dockerfile"
   workflow_dispatch:
 
 jobs:
@@ -24,8 +24,8 @@ jobs:
       - name: Get image name and version
         id: image
         run: |
-          version=$(grep -oP '(?<=^LABEL org\.opencontainers\.image\.version=)\d+\.\d+\.\d+$' docker/haos-qemu/Dockerfile)
-          echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/haos-qemu" >> "$GITHUB_OUTPUT"
+          version=$(grep -oP '(?<=^LABEL org\.opencontainers\.image\.version=)\d+\.\d+\.\d+$' docker/qemu/Dockerfile)
+          echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qemu" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
@@ -42,9 +42,9 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v6
         with:
-          cache-from: type=gha,scope=haos-qemu
-          cache-to: type=gha,scope=haos-qemu,mode=max
-          context: docker/haos-qemu
+          cache-from: type=gha,scope=qemu
+          cache-to: type=gha,scope=qemu,mode=max
+          context: docker/qemu
           platforms: linux/amd64
           push: true
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
