@@ -24,9 +24,14 @@ jobs:
       - name: Get image name and version
         id: image
         run: |
-          version=$(grep -oP '(?<=^LABEL org\.opencontainers\.image\.version=)\d+\.\d+\.\d+$' docker/qemu/Dockerfile)
+          version=$(sed -n 's/^ARG QEMU_VERSION=//p' docker/qemu/Dockerfile)
+          test -n "$version"
+          # OCI tags cannot contain Debian's epoch separator, plus or tilde.
+          tag=${version//:/-}
+          tag=${tag//+/_}
+          tag=${tag//\~/_tilde_}
           echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qemu" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
