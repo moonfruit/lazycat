@@ -2,64 +2,88 @@ name: Build image for qemu
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - ".github/workflows/build-qemu.yml"
-      - "docker/qemu/Dockerfile"
+      - "docker/qemu/**"
+  schedule:
+    - cron: "23 3 * * 1"
   workflow_dispatch:
+
+concurrency:
+  group: qemu-ghcr-release
+  cancel-in-progress: false
 
 jobs:
   build-image:
-    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
       attestations: write
       id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
-      - name: Get image name and version
-        id: image
+      - name: Check content comparison
+        run: python3 -B -m unittest discover -s docker/qemu
+
+      - name: Select image and version
         run: |
           version=$(sed -n 's/^ARG QEMU_VERSION=//p' docker/qemu/Dockerfile)
-          test -n "$version"
-          # OCI tags cannot contain Debian's epoch separator, plus or tilde.
-          tag=${version//:/-}
-          tag=${tag//+/_}
-          tag=${tag//\~/_tilde_}
-          echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qemu" >> "$GITHUB_OUTPUT"
-          echo "version=$tag" >> "$GITHUB_OUTPUT"
+          [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qemu" >> "$GITHUB_ENV"
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
-        id: build-and-push
+      - name: Build fresh candidate
         uses: docker/build-push-action@v6
         with:
-          cache-from: type=gha,scope=qemu
-          cache-to: type=gha,scope=qemu,mode=max
           context: docker/qemu
           platforms: linux/amd64
-          push: true
+          pull: true
+          no-cache: true
+          # The published digest receives a separate GitHub provenance attestation below.
+          provenance: false
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ steps.image.outputs.version }}
-            ${{ steps.image.outputs.name }}:latest
+          outputs: |
+            type=oci,dest=${{ runner.temp }}/candidate.oci
+            type=tar,dest=${{ runner.temp }}/candidate.tar
 
-      - name: Generate attestation
+      - name: Compare with last published revision
+        id: release
+        run: docker/qemu/compare-release.sh "$IMAGE" "$VERSION" "$RUNNER_TEMP"
+
+      - name: Upload new image by digest
+        if: steps.release.outputs.changed == 'true'
+        env:
+          DIGEST: ${{ steps.release.outputs.digest }}
+        run: skopeo copy --all --preserve-digests "oci-archive:$RUNNER_TEMP/candidate.oci" "docker://$IMAGE@$DIGEST"
+
+      - name: Attest new revision
+        if: steps.release.outputs.changed == 'true'
         uses: actions/attest-build-provenance@v3
         with:
-          subject-name: ${{ steps.image.outputs.name }}
-          subject-digest: ${{ steps.build-and-push.outputs.digest }}
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.release.outputs.digest }}
           push-to-registry: true
+
+      - name: Publish revision and aliases
+        if: steps.release.outputs.tags != ''
+        env:
+          DIGEST: ${{ steps.release.outputs.digest }}
+          TAGS: ${{ steps.release.outputs.tags }}
+        run: |
+          git fetch --quiet origin main
+          git diff --exit-code HEAD FETCH_HEAD -- docker/qemu .github/workflows/build-qemu.yml
+          for tag in $TAGS; do
+            docker buildx imagetools create --prefer-index=false --tag "$IMAGE:$tag" "$IMAGE@$DIGEST"
+          done
