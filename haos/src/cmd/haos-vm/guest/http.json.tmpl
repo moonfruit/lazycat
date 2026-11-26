@@ -1,0 +1,22 @@
+{
+  "version": 3,
+  "minor_version": 1,
+  "key": "http",
+  "data": {
+    "stable": {
+      "server_port": 80,
+      "use_x_forwarded_for": true,
+      "trusted_proxies": ["{{.AppSubnet}}"],
+      "cors_allowed_origins": ["https://cast.home-assistant.io"],
+      "login_attempts_threshold": -1,
+      "ip_ban_enabled": true,
+      "ssl_profile": "intermediate_v6",
+      "use_x_frame_options": true,
+      "created_at": "{{.CreatedAt}}",
+      "error": null,
+      "error_message": null
+    },
+    "pending": null,
+    "yaml_migration_done": true
+  }
+}

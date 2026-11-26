@@ -1,0 +1,19 @@
+application:
+  subdomain: haos
+  background_task: true
+  kvm_accel: true
+  multi_instance: false
+  upstreams:
+    - location: /
+      backend: http://qemu:8123/
+
+services:
+  qemu:
+    image: ghcr.io/moonfruit/qemu:10.0.13-r1
+    netadmin: true
+    command: /lzcapp/pkg/content/haos-vm
+    environment:
+      - {{ printf "HAOS_CPUS=%s" (or .U.CPUs "2") | printf "%q" }}
+      - {{ printf "HAOS_MEMORY_MIB=%s" (or .U.MemoryMiB "4096") | printf "%q" }}
+      - {{ printf "HAOS_HOST_IP=%s" (or .U.HostIP "") | printf "%q" }}
+      - {{ printf "HAOS_OWNER=%s" .U.Owner | printf "%q" }}

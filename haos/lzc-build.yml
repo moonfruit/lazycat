@@ -1,0 +1,31 @@
+manifest: ./lzc-manifest.yml
+contentdir: ./dist
+buildscript: |
+  set -e
+  rm -rf dist
+  mkdir dist
+  cp src/cmd/haos-vm/guest/prepare.sh dist/
+  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C src build -trimpath -o ../dist/haos-vm ./cmd/haos-vm
+pkgout: ./
+icon: ./lzc-icon.png
+compose_override:
+  networks:
+    haoslan:
+      driver: macvlan
+      driver_opts:
+        parent: enp2s0
+      ipam:
+        config:
+          # Only Docker allocates this subnet. The guest uses the physical LAN's DHCP.
+          - subnet: 192.0.2.0/29
+  services:
+    qemu:
+      stop_grace_period: 8m
+      networks:
+        default: {}
+        haoslan:
+          # The guest owns this NIC's IPv6 addresses as well as its DHCP lease.
+          driver_opts:
+            com.docker.network.endpoint.sysctls: net.ipv6.conf.IFNAME.disable_ipv6=1
+
+# cspell:words haoslan macvlan IFNAME

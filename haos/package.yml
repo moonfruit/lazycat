@@ -1,0 +1,18 @@
+package: com.github.moonfruit.haos
+version: 0.4.2
+name: Home Assistant OS
+description: 在独立的 x86-64 虚拟机中运行的 Home Assistant OS
+homepage: https://www.home-assistant.io/
+min_os_version: 1.5.0
+locales:
+  en-US:
+    name: Home Assistant OS
+    description: Home Assistant OS which runs in an x86-64 VM
+permissions:
+  required:
+    - device.kvm
+    - net.admin
+    - net.lan
+    - net.internet
+    - document.private
+    - compose.override

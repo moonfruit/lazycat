@@ -1,0 +1,20 @@
+params:
+  - id: CPUs
+    type: string
+    name: 虚拟 CPU 数量
+    default_value: "2"
+    optional: true
+  - id: MemoryMiB
+    type: string
+    name: 虚拟机内存（MiB）
+    default_value: "4096"
+    optional: true
+  - id: HostIP
+    type: string
+    name: 懒猫宿主 IPv4 地址（留空自动识别）
+    optional: true
+    description: 启动时读取所选有线网口的主 IPv4，供 HAOS 访问宿主 SMB、WebDAV 等服务。要指定其他地址可手填。自动识别失败时 HAOS 仍会启动。
+  - id: Owner
+    type: lzc_uid
+    name: 文稿所属用户
+    description: HA 可读写该用户应用文稿下的 Media/ 和 Share/，本地备份写入 Backups/。可将 haos_ova-18.4.qcow2.xz 预先放入同级 Images/，缺少镜像时应用会自动下载。

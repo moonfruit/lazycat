@@ -1,0 +1,18 @@
+[connection]
+id=HAOS LPK management
+uuid=4b54a2c0-5cbd-4b3d-89dd-e04404ee0202
+type=ethernet
+interface-name=enp0s2
+autoconnect-priority=999
+
+[ipv4]
+method=manual
+address1={{.GuestCIDR}}
+never-default=true
+route1={{.AppSubnet}},{{.Gateway}}
+{{if .HostRoute -}}
+route2={{.HostRoute}},{{.Gateway}}
+{{end}}
+
+[ipv6]
+method=disabled
