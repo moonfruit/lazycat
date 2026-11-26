@@ -29,7 +29,7 @@ make update     # 当目录下存在 update.sh 时运行它
 - **纯转发型** （`switch1`、`switch2`、`bambu-studio`、`myip`、`httpbin`、`hivision-idphotos`、`vuetorrent`、`caddy`）：没有 `contentdir`，或 `contentdir` 仅为打包好的下游镜像配置；逻辑全在 `lzc-manifest.yml` 的 `services` + `upstreams`/`routes` 里。
 - **打包静态资源型** （`aria2`）：`update.sh` 下载上游产物到 `dist/<sub>/`，构建时一并打包；含 `hack.py` 等小工具向 HTML 注入脚本以适配 LazyCat 域名/RPC。
 - **Go 反向代理伴侣型** （`router`、`netcat`、`aipod`）：`lzc-build.yml` 的 `buildscript` 用 `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C src build -o ../dist/` 交叉编译，再由 `upstreams.backend_launch_command` 拉起。`aipod` 与 `router` 共享 `router/src/`。
-- **基础镜像** （`docker/aria2`、`docker/crond`）：仅 `Dockerfile` + `update.sh`；由 `.github/workflows/build-*.yml` 在 push 到 `main` 且对应 Dockerfile 改动时构建多架构镜像并推送到 `ghcr.io/moonfruit/<name>:<version>` 和 `:latest`，含 build provenance attestation。
+- **基础镜像** （`docker/aria2`、`docker/crond`）：仅 `Dockerfile` + `update.sh`；由 `.github/workflows/build-*.yml` 在 push 到 `main` 且对应 Dockerfile 改动时构建 `linux/amd64` 镜像并推送到 `ghcr.io/moonfruit/<name>:<version>` 和 `:latest`，含 build provenance attestation。
 
 ## 版本更新约定（重要）
 
