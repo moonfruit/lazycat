@@ -34,7 +34,7 @@ if [[ -n $existing ]] && [[ $(jq -r '.draft' <<< "$existing") == false ]]; then
     exit 0
 fi
 if [[ -z $existing ]]; then
-    gh release create "$tag" --draft --target "$GITHUB_SHA" --title "HttpBin $version" \
+    gh release create "$tag" --draft --target "$RELEASE_SHA" --title "HttpBin $version" \
         --notes "LazyCat LPK · $package · $version"
 else
     # Only resume a draft whose source files match the current build.

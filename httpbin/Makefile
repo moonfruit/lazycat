@@ -1,5 +1,9 @@
 all: app.lpk
 
+.PHONY: update
+update:
+	./update.sh
+
 app.lpk: lzc-*
 	lzc-cli project build -o app.lpk
 
