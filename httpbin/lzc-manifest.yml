@@ -1,9 +1,9 @@
 name: HttpBin
 package: com.github.moonfruit.httpbin
-version: 0.9.3
+version: 0.10.4
 description: HTTP Request & Response Service, written in Python + Flask
 license: https://choosealicense.com/licenses/isc/
-homepage: https://github.com/postmanlabs/httpbin
+homepage: https://github.com/psf/httpbin
 author: MoonFruit
 application:
   subdomain: httpbin
@@ -11,8 +11,10 @@ application:
     - /
   upstreams:
     - location: /
-      backend: http://httpbin/
+      backend: http://httpbin:8080/
       use_backend_host: false
 services:
   httpbin:
-    image: kennethreitz/httpbin@sha256:599fe5e5073102dbb0ee3dbb65f049dab44fa9fc251f6835c9990f8fb196a72b
+    image: ghcr.io/psf/httpbin:0.10.4@sha256:c0a0cc396b38d7083a3664076e6f728649e2b2a42ed3d493dbf9266ca55c461f
+    # In 0.10.4 the default worker requires gevent >=24.10.1, but the image ships 24.2.1.
+    command: /opt/httpbin/bin/gunicorn --bind 0.0.0.0:8080 --worker-class gthread --threads 4 httpbin:app

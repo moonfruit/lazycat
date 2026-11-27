@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       check_upstream:
-        description: Check for a new upstream image digest
+        description: Check for a new stable PSF image version
         type: boolean
         default: false
 
@@ -45,20 +45,25 @@ jobs:
       - name: Check the upstream image
         if: github.event_name == 'schedule' || inputs.check_upstream
         run: ./httpbin/update.sh -N
-      - id: changes
+      - name: Verify image pin and detect manifest changes
+        id: changes
         run: |
+          version=$(yq -er '.version' httpbin/lzc-manifest.yml)
+          image=$(yq -er '.services.httpbin.image' httpbin/lzc-manifest.yml)
+          prefix="ghcr.io/psf/httpbin:$version@sha256:"
+          [[ $image == "$prefix"* && ${image#"$prefix"} =~ ^[0-9a-f]{64}$ ]]
           if git diff --quiet -- httpbin/lzc-manifest.yml; then
             echo 'image=false' >> "$GITHUB_OUTPUT"
           else
             echo 'image=true' >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/setup-node@v7
-        if: steps.changes.outputs.image == 'true'
+        if: steps.changes.outputs.image == 'true' || github.event_name == 'push'
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Test updated package and image before recording the version
-        if: steps.changes.outputs.image == 'true'
+      - name: Test package version and pinned PSF image
+        if: steps.changes.outputs.image == 'true' || github.event_name == 'push'
         run: |
           npm install -g @lazycatcloud/lzc-cli@2.0.9
           lzc-cli project build httpbin -o "$RUNNER_TEMP/httpbin.lpk"
@@ -67,9 +72,16 @@ jobs:
           grep -Fx "version: $version" "$RUNNER_TEMP/lpk-info"
           grep -Fx 'package: com.github.moonfruit.httpbin' "$RUNNER_TEMP/lpk-info"
           image=$(yq -r '.services.httpbin.image' httpbin/lzc-manifest.yml)
-          docker run -d --name httpbin -p 127.0.0.1:8000:80 "$image"
+          read -r -a command <<< "$(yq -r '.services.httpbin.command // ""' httpbin/lzc-manifest.yml)"
+          docker run -d --name httpbin -p 127.0.0.1:8000:8080 "$image" "${command[@]}"
           curl -fsS --retry 12 --retry-all-errors --retry-delay 2 \
             'http://127.0.0.1:8000/get?source=lazycat' | jq -e '.args.source == "lazycat"'
+          installed=$(docker exec httpbin /opt/httpbin/bin/python -c 'from importlib.metadata import version; print(version("httpbin"))')
+          [[ $installed == "$version" ]]
+      - name: Record the new upstream version
+        if: steps.changes.outputs.image == 'true'
+        run: |
+          version=$(yq -er '.version' httpbin/lzc-manifest.yml)
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- httpbin/lzc-manifest.yml

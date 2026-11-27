@@ -7,6 +7,6 @@ HttpBin for Lazycat
 https://moonfruit.github.io/lazycat/source/v2/index.json
 ```
 
-GitHub Actions 每天台北时间 05:43 检查上游镜像。digest 变化时，工作流递增 LPK 补丁版本，打包并测试新版镜像的 `/get`，通过后将这次变更提交到 `main`。每个版本的 Release 包含 LPK、SHA-256 和字节数记录。生成软件源时会重新下载公开附件核对记录。
+GitHub Actions 每天台北时间 05:43 检查 `ghcr.io/psf/httpbin`。出现更高的稳定版本标签（如 `0.10.4`）时，工作流将 LPK 版本设为该标签，锁定对应的镜像 digest，打包并测试 `/get`，通过后提交到 `main`。同一标签被重新推送时，已发布的 LPK 继续使用原 digest。每个版本的 Release 包含 LPK、SHA-256 和字节数记录。生成软件源时会重新下载公开附件核对记录。
 
-手动运行 **Publish HttpBin LPK and software source** 可以从现有 Release 恢复索引。勾选 **Check for a new upstream image digest** 可立即执行日常更新检查。
+手动运行 **Publish HttpBin LPK and software source** 可以从现有 Release 恢复索引。勾选 **Check for a new stable PSF image version** 可立即执行日常更新检查。
