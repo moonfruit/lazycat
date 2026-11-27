@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.yaml.in/yaml/v3"
 )
 
 const defaults = "# 保留注释\r\n---\r\ndefault_config:\r\nautomation: !include automations.yaml\r\n...\r\n"
@@ -162,6 +164,13 @@ func TestInstallAndReconcileRestoredCredentials(t *testing.T) {
 	provider := f.read(providerConfig)
 	if !strings.Contains(provider, "admin: ADMIN") || !strings.Contains(provider, "display_name: 懒猫微服") || strings.Contains(private, "roles") {
 		t.Fatal("initial role mapping and provider settings must be in the editable provider YAML")
+	}
+	var options struct{ Features map[string]bool }
+	if err := yaml.Unmarshal([]byte(provider), &options); err != nil {
+		t.Fatal(err)
+	}
+	if !options.Features["automatic_user_linking"] {
+		t.Fatal("first-time OIDC sign-in must link a matching local username")
 	}
 	info, err := f.root.Stat(privateConfig)
 	if err != nil || info.Mode().Perm() != 0600 || !strings.Contains(private, `a: #\"b`) {

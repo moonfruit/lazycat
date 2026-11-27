@@ -63,7 +63,9 @@ HAOS 的 LAN 地址监听 80，局域网设备可以直接访问。LAN 和 TCP �
 
 登录名称、角色映射等设置可在 `/config/.haos-lpk-oidc/provider.yaml` 中修改。该文件通过 HA 的 `!secret` 读取同目录的 `secrets.yaml`。只要保留插件和这份配置的引用，LPK 就会在懒猫轮换凭据时更新 `secrets.yaml`（权限 `0600`），检查配置并重启 Core。恢复备份后同样使用当前部署的凭据。[HA 的 YAML 密钥](https://www.home-assistant.io/docs/configuration/secrets/)
 
-从懒猫 HTTPS 应用域名选择「懒猫微服」登录。懒猫返回的 `groups` 包含 `ADMIN` 时，新建的 HA 用户具有管理员权限，其余新用户为普通用户。已有用户的角色在 HA 中管理。OIDC 用户只持有 OIDC 登录凭据，普通用户无法通过 HA 原生 Web UI 自行添加第一组本地用户名和密码。需要局域网密码登录时，HA 管理员可通过 Core 的 `config/auth_provider/homeassistant/create` 接口把本地凭据加到同一个用户。现有本地账号仍可从登录选择页进入。[角色映射](https://github.com/christiaangoossens/hass-oidc-auth/blob/v1.3.0/docs/configuration.md) · [HA 本地凭据接口](https://github.com/home-assistant/core/blob/2026.11.3/homeassistant/components/config/auth_provider_homeassistant.py#L29)
+从懒猫 HTTPS 应用域名选择「懒猫微服」登录。首次登录时，插件用懒猫的 `preferred_username` 精确匹配 HA 本地登录用户名，区分大小写。要复用初始 Owner，请在创建家庭时用懒猫返回的完整用户名，例如 `moon@dkmooncat.heiyu.space`；显示姓名可自由填写。同名绑定适用于所有本地账号，绑定后本地密码和懒猫登录都进入原账号，并获得其现有权限。后续登录按已绑定的 OIDC 身份识别。[插件的账号匹配规则](https://github.com/christiaangoossens/hass-oidc-auth/blob/v1.3.0/custom_components/auth_oidc/provider.py#L249-L314)
+
+没有可关联账号时，插件会创建 HA 用户。懒猫返回的 `groups` 包含 `ADMIN` 时，新用户具有管理员权限，其余为普通用户。新建的 OIDC 用户只持有 OIDC 凭据，需要局域网密码登录时，HA 管理员可通过 Core 的 `config/auth_provider/homeassistant/create` 接口为其添加本地凭据。[角色映射](https://github.com/christiaangoossens/hass-oidc-auth/blob/v1.3.0/docs/configuration.md) · [HA 本地凭据接口](https://github.com/home-assistant/core/blob/2026.11.3/homeassistant/components/config/auth_provider_homeassistant.py#L29)
 
 懒猫注册的回调地址是应用 HTTPS 域名下的 `/auth/oidc/callback`。HA Core 使用自己的 DNS 解析盒子域名，并校验真实域名的 TLS 证书。启用 OIDC 时，QEMU 管理容器为管理网卡提供双栈用户网络，HAOS 虚拟机通过 NetworkManager 将懒猫内部 IPv6 网段 `fc03:1136:3800::/40` 路由到管理网关。家庭 LAN 仍提供默认路由和 DNS。网页入口继续使用原有的 `8123 → 80` 转发，从 LAN IP 或端口转发地址进入时可选择 HA 本地登录。[懒猫网络机制](https://developer.lazycat.cloud/network.html) · [懒猫 OIDC](https://developer.lazycat.cloud/advanced-oidc.html)
 
