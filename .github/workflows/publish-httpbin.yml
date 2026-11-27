@@ -25,6 +25,10 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   prepare:
     if: github.ref == 'refs/heads/main'
@@ -75,15 +79,16 @@ jobs:
         id: select
         env:
           EVENT: ${{ github.event_name }}
+          CHECK_UPSTREAM: ${{ inputs.check_upstream }}
           IMAGE_CHANGED: ${{ steps.changes.outputs.image }}
         run: |
           echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           publish=true
-          if [[ "$EVENT" == schedule && "$IMAGE_CHANGED" == false ]]; then
+          if [[ "$IMAGE_CHANGED" == false && ( "$EVENT" == schedule || "$CHECK_UPSTREAM" == true ) ]]; then
             version=$(yq -r '.version' httpbin/lzc-manifest.yml)
             url="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/source/v2/index.json"
-            if curl -fsSL --max-time 30 "$url" | jq -e --arg v "$version" \
-                '.apps[] | select(.packageId == "com.github.moonfruit.httpbin") | .latestVersion.version == $v'; then
+            if curl -fsSL --max-time 30 "$url" | jq -es --arg v "$version" \
+                'any(.[].apps[]; .packageId == "com.github.moonfruit.httpbin" and .latestVersion.version == $v)'; then
               publish=false
             fi
           fi
