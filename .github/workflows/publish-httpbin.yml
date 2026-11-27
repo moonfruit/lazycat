@@ -1,0 +1,73 @@
+name: Publish HttpBin LPK and software source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - httpbin/lzc-*
+      - httpbin/package.yml
+      - scripts/lpk/**
+      - .github/workflows/publish-httpbin.yml
+  workflow_dispatch:
+
+concurrency:
+  group: lpk-source-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm install -g @lazycatcloud/lzc-cli@2.0.9
+      - name: Build and publish versioned LPK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/lpk/publish-httpbin.sh
+
+  index:
+    needs: release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: pages
+        uses: actions/configure-pages@v6
+      - name: Build index from published releases and verify public downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: python3 scripts/lpk/source.py "$BASE_URL" site/source/v2/index.json
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: index
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5
