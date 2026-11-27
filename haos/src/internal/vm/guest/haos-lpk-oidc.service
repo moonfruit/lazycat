@@ -1,0 +1,10 @@
+[Unit]
+Description=Configure LazyCat OIDC in Home Assistant
+After=docker.service
+PartOf=docker.service
+ConditionFileIsExecutable=/run/haos-oidc/haos-vm
+
+[Service]
+ExecStart=/run/haos-oidc/haos-vm oidc --watch
+Restart=on-failure
+RestartSec=5min

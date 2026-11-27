@@ -4,11 +4,18 @@
 
 ## 构建和安装
 
-构建机需要 `lzc-cli`、Go 1.26 或更新版本和 Make。`make uninstall` 另需 `yq` 读取包名。LPK 携带静态 Go 启动器 `haos-vm`，懒猫从 GHCR 拉取 [manifest](lzc-manifest.yml) 指定的 x86-64 QEMU 镜像。目标设备需要支持 KVM 的 x86-64 CPU。默认分配 2 个 vCPU、4 GiB 内存，初始系统盘虚拟容量为 32 GiB，实际占用随使用增长。
+构建机需要 `lzc-cli`、Go 1.26 或更新版本、Make、`curl`、`shasum`、`unzip` 和 `jq`。`make uninstall` 另需 `yq` 读取包名。LPK 携带一个静态 Go 程序 `haos-vm`、插件归档 `hass-oidc-auth.zip` 和许可证 `hass-oidc-auth.LICENSE.md`。懒猫从 GHCR 拉取 [manifest](lzc-manifest.yml) 指定的 x86-64 QEMU 镜像。目标设备需要支持 KVM 的 x86-64 CPU。默认分配 2 个 vCPU、4 GiB 内存，初始系统盘虚拟容量为 32 GiB，实际占用随使用增长。
+
+| 执行位置 | 命令 | 用途 |
+|---|---|---|
+| qemu | `haos-vm` 或 `haos-vm vm` | 准备网络和磁盘，启动虚拟机并处理停机 |
+| haos | `haos-vm oidc` | 初装 OIDC 插件并核对当前部署的凭据 |
+| haos | `haos-vm oidc --watch` | 随 Docker 启动核对一次，随后监听恢复备份产生的凭据变化 |
+| haos | `haos-vm oidc --recover` | 在 Docker 启动前回滚上次中断的配置写入 |
 
 在仓库根运行 `./docker/qemu/update.sh` 可更新 QEMU 上游版本，根目录的 `./update.sh` 也会调用它。CI 每周一重新拉取 `debian:trixie-slim`，安装与上游版本匹配的最新 Debian 修订。CI 对比最终文件系统和运行配置，有实质变化时才发布 `<QEMU版本>-rN`，同时更新上游版本标签和 `latest`。文件时间、镜像构建时间和归档顺序不计入比较。[更新脚本](../docker/qemu/update.sh) · [GitHub Actions 工作流](../.github/workflows/build-qemu.yml)
 
-在本目录执行 `make update` 可以更新初装镜像和 QEMU 依赖。脚本读取 HAOS 稳定渠道中 OVA 的版本，核对对应 QCOW2 压缩包的 SHA-256，并选择 GHCR 已发布的最新 QEMU 修订标签。LPK 版本由 `package.yml` 单独管理。[LPK 更新脚本](update.sh)
+在本目录执行 `make update` 可以更新初装镜像、QEMU 和新实例使用的 OIDC 插件版本。脚本读取 HAOS 稳定渠道中 OVA 的版本，核对对应 QCOW2 压缩包的 SHA-256，选择 GHCR 已发布的最新 QEMU 修订，并记录插件正式发布包的版本和 SHA-256。`make` 在构建时下载并校验插件，有有效缓存时直接复用。LPK 版本由 `package.yml` 单独管理。[LPK 更新脚本](update.sh)
 
 构建并安装：
 
@@ -37,7 +44,7 @@ lzc-cli app install app.lpk
 
 | 从哪里访问 | 地址 |
 |---|---|
-| 懒猫客户端 | 打开 Home Assistant OS 应用，经过懒猫登录和 HA 自身登录 |
+| 懒猫客户端 | 打开 Home Assistant OS 应用，在 HA 登录页选择「懒猫微服」使用当前懒猫账号 |
 | 局域网其他物理设备 | 路由器分配的 HAOS 地址，例如 `http://<HAOS-LAN-IP>/` |
 | 家庭 Wi-Fi 或 Tailscale 子网路由 | 设置物理网卡转发后，两种网络都使用 `http://<盒子局域网IP>:39128/` |
 | HAOS 访问宿主 SMB/WebDAV | 使用自动识别或手动指定的宿主局域网地址，已有共享按原有凭据认证 |
@@ -45,6 +52,22 @@ lzc-cli app install app.lpk
 在懒猫的「局域网端口转发工具」添加 TCP 规则，入口选物理网卡，目标选「微服应用 → Home Assistant OS → qemu」，目标端口填 `8123`。例如在 dkmooncat 监听 `enp2s0 · 192.168.50.11:39128`。HAOS 包只提供内部服务端口，宿主端口由转发工具分配。手机经 Tailscale 访问时需要盒子发布对应的 LAN 子网路由，并允许手机访问该端口。Companion App 对 HTTP 外部地址的支持取决于连接安全设置。[端口转发工具](https://lazycat.cloud/appstore/detail/cloud.lazycat.app.forward) · [Companion App 连接设置](https://companion.home-assistant.io/docs/getting_started/connection-security-level/)
 
 HAOS 的 LAN 地址监听 80，局域网设备可以直接访问。LAN 和 TCP 转发入口使用 HA 自身认证，首次安装时请完成 HA 用户注册。
+
+### 懒猫账号登录
+
+首次启动时，先在 HA 完成家庭设置并创建本地 Owner，或通过向导恢复备份。LPK 随后从包内安装 OpenID Connect/SSO Authentication，写入默认登录配置，通过 `ha core check` 后重启 Core。如果检查失败，配置程序会撤回本次修改并稍后重试。若已自行安装或配置同名集成，则沿用已有设置。[OIDC 集成](https://github.com/christiaangoossens/hass-oidc-auth)
+
+启用 OIDC 时，qemu 在每次 haos 开机时提供固定的 `haos-lpk-oidc.service`。Docker 启动前先恢复中断的配置写入，启动后立即核对部署凭据。等待家庭设置完成期间约每 30 秒检查一次。初装成功后，服务阻塞等待 Linux 文件通知。覆盖受管的 `secrets.yaml`、替换其父目录或替换整个 HA 配置目录都会触发核对。恢复备份时会等 Supervisor 回到运行状态再同步。配置校验或 Core 重启失败后，等待 5 分钟再试。
+
+初装成功后，插件的升级和卸载都由 HA 管理。要在 HA 页面收到更新，先配置 HACS，在 HACS 中搜索「OpenID Connect」并下载一次。HACS 会将插件下载到初装使用的同一目录 `/config/custom_components/auth_oidc/`，随后通过 HA 的更新页面提供新版本。保留初装版本且未在 HACS 下载时，插件会一直使用 HA 配置目录中现有的文件，管理员也可以手工更新。重启或升级 LPK 会保留 HA 中的插件版本，卸载插件后也会保留卸载状态。彻底移除懒猫登录时，一并从 `configuration.yaml` 删除对应的 `auth_oidc: !include` 行。[插件安装指南](https://github.com/christiaangoossens/hass-oidc-auth/blob/v1.3.0/README.md#installation-guide) · [HACS 接管已有插件](https://www.hacs.xyz/docs/faq/existing_elements/) · [HACS 更新](https://www.hacs.xyz/docs/use/entities/update/)
+
+登录名称、角色映射等设置可在 `/config/.haos-lpk-oidc/provider.yaml` 中修改。该文件通过 HA 的 `!secret` 读取同目录的 `secrets.yaml`。只要保留插件和这份配置的引用，LPK 就会在懒猫轮换凭据时更新 `secrets.yaml`（权限 `0600`），检查配置并重启 Core。恢复备份后同样使用当前部署的凭据。[HA 的 YAML 密钥](https://www.home-assistant.io/docs/configuration/secrets/)
+
+从懒猫 HTTPS 应用域名选择「懒猫微服」登录。懒猫返回的 `groups` 包含 `ADMIN` 时，新建的 HA 用户具有管理员权限，其余新用户为普通用户。已有用户的角色在 HA 中管理。OIDC 用户只持有 OIDC 登录凭据，普通用户无法通过 HA 原生 Web UI 自行添加第一组本地用户名和密码。需要局域网密码登录时，HA 管理员可通过 Core 的 `config/auth_provider/homeassistant/create` 接口把本地凭据加到同一个用户。现有本地账号仍可从登录选择页进入。[角色映射](https://github.com/christiaangoossens/hass-oidc-auth/blob/v1.3.0/docs/configuration.md) · [HA 本地凭据接口](https://github.com/home-assistant/core/blob/2026.11.3/homeassistant/components/config/auth_provider_homeassistant.py#L29)
+
+懒猫注册的回调地址是应用 HTTPS 域名下的 `/auth/oidc/callback`。HA Core 使用自己的 DNS 解析盒子域名，并校验真实域名的 TLS 证书。启用 OIDC 时，QEMU 管理容器为管理网卡提供双栈用户网络，HAOS 虚拟机通过 NetworkManager 将懒猫内部 IPv6 网段 `fc03:1136:3800::/40` 路由到管理网关。家庭 LAN 仍提供默认路由和 DNS。网页入口继续使用原有的 `8123 → 80` 转发，从 LAN IP 或端口转发地址进入时可选择 HA 本地登录。[懒猫网络机制](https://developer.lazycat.cloud/network.html) · [懒猫 OIDC](https://developer.lazycat.cloud/advanced-oidc.html)
+
+每个 qemu 实例的管理链路都使用固定的 IPv6 私有前缀 `fd97:42b6:7a61:2::/64`。虚拟网关使用 `::2`，haos 的 `enp0s2` 静态使用 `::15`。多个实例的管理链路彼此隔离，可以复用地址。如果同一台 haos 还需经 LAN 或 VPN 访问这个前缀内的地址，其管理网卡的直连路由可能与之冲突。启动器目前不会自动另选前缀。
 
 应用域名的路径为 `app（懒猫 HTTPS 反代）→ qemu 的桥接 IPv4:8123 → haos 管理网卡:80`。QEMU 直接监听 8123，通过内置的 `hostfwd` 把连接交给 haos。haos 看到的 TCP 对端是 app 的桥接地址。
 
@@ -77,6 +100,18 @@ haos 将应用 `/26` 的回程流量通过第二块网卡 `enp0s2` 送往管理�
 应用把系统盘、UEFI 变量和两张网卡的 MAC 保存在 `/lzcapp/var/haos`。更新 LPK 时继续使用已有磁盘，HAOS、Supervisor 和 Core 的日常更新使用 Home Assistant 自身的更新入口。停止 LPK 时，启动器通过 ACPI 和 QEMU Guest Agent 请求关机，最多等访客 460 秒，再给 QEMU 5 秒退出。Compose 的 `stop_grace_period: 8m` 把容器强制终止的期限放在两段等待之后，访客提早关机会立即结束等待。
 
 需要共享其他目录时，可在 HAOS 的“设置 → 系统 → 存储”添加宿主 SMB，共享用途可以选媒体、共享文件或备份。HA 自带的 WebDAV 集成专用于增加备份位置。本地 `Backups/` 挂载独立于这两项服务。[网络存储](https://www.home-assistant.io/common-tasks/os/#network-storage) · [WebDAV 集成](https://www.home-assistant.io/integrations/webdav/)
+
+## 0.5.0 懒猫登录验收
+
+在开发机的隔离 HAOS 18.4、Core 2026.11.3 中完成首次设置后，连续观察 70 秒，受管的 `secrets.yaml` 没有被打开，Core 也没有重启。通过 Supervisor 创建并恢复一份含旧测试凭据的备份，备份中的标记文件恢复成功，同一监听进程自动将凭据同步为当前值。直接覆盖 `secrets.yaml`、将含旧凭据的整个 HA 配置目录移入原路径，也分别触发了同步。
+
+开发期在盒子上的独立 HAOS 18.4 实例使用 Core 2026.11.3 完成首次设置。LPK 自动装入 v1.3.0 集成，登录选择页同时显示懒猫和本地登录。Core 经管理网关读取真实 issuer 的 discovery 和 JWKS 均收到 HTTP 200。集成生成的授权请求使用应用 HTTPS 域名的 `/auth/oidc/callback`、`openid profile groups` 和 PKCE S256。Supervisor 生成的宿主备份包含 OIDC 配置和插件。用 Supervisor 恢复一份带有旧测试密钥的备份后，配置程序自动换回当前凭据。重新部署和两次停止再启动隔离 LPK，懒猫都保留客户端 ID 并轮换密钥。通过 HA 页面重启 Core 或重启 HAOS 时，客户端凭据保持一致。
+
+另以 Core 2026.11.3、同一插件和模拟身份服务验证两种角色。无论 `groups` 来自 ID Token 还是 UserInfo，`ADMIN` 和 `NORMAL` 均在首次登录获得对应权限，第二次登录时改组仍保留原 HA 权限。Core 拒绝了普通用户自行添加首组本地凭据的请求。管理员为同一用户添加凭据后，密码验证成功，原 OIDC 凭据和普通用户权限均保留。
+
+改为一次性安装后，在本地用新 LPK 中的插件和访客程序生成的配置分别验证初装和轮换密钥后的登录。测试模拟 HACS 替换插件目录，并修改登录名称和请求范围。Core 2026.11.3 在两种情况下均能加载配置，与模拟身份服务完成登录。访客程序的 Go 测试还覆盖了升级 LPK 后保留插件版本、卸载后保持卸载，以及首次检查失败时回滚。
+
+2026-11-27，在 dkmooncat 的独立实例上对照测试了 OIDC 网络。Core 2026.11.3 通过 HA DNS `172.30.32.3` 解析到的 issuer IPv6 地址与 QEMU 管理容器相同。经家庭 LAN 默认网关请求 discovery 超时；在同一个 Core 中将目标改经管理网卡、选用该网卡的 IPv6 源地址后，discovery 和 JWKS 均返回 200。使用最终 LPK 的程序冷启动后，NetworkManager 自动建立懒猫 `/40` 路由，插件完成了初装。暂停 OIDC 定时器并执行 `ha core rebuild` 后，新 Core 容器仍直接访问两个端点并通过 TLS 校验。Core 的 hosts 中没有 issuer 记录，QEMU 管理容器中也没有 OIDC 443 监听。
 
 ## 0.4 文件共享与端口转发实测
 

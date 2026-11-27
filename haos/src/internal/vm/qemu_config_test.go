@@ -1,4 +1,4 @@
-package main
+package vm
 
 import (
 	"encoding/base64"
@@ -46,6 +46,11 @@ func TestGuestRoutesAndBackup(t *testing.T) {
 			if !strings.Contains(credentials["systemd.unit-dropin.docker.service~haos-lpk"], "ExecStartPre=/bin/sh /sys/firmware/qemu_fw_cfg/by_name/opt/haos-lpk/prepare/raw ") ||
 				!strings.Contains(line, "name=opt/haos-lpk/prepare,file=/lzcapp/pkg/content/prepare.sh") {
 				t.Error("missing first-start provisioning before Docker")
+			}
+			for name, content := range credentials {
+				if strings.Contains(name, "oidc") || strings.Contains(content, "haos-lpk-oidc") || strings.Contains(content, "/run/haos-oidc") {
+					t.Fatalf("unexpected OIDC unit or dependency with OIDC disabled: %s", name)
+				}
 			}
 			network, httpFile, _ := strings.Cut(strings.TrimSpace(credentials["tmpfiles.extra"]), "\n")
 			seed := strings.Fields(httpFile)

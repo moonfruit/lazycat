@@ -1,6 +1,4 @@
-//go:build linux
-
-package main
+package vm
 
 import (
 	"bytes"

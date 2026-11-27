@@ -1,11 +1,6 @@
 manifest: ./lzc-manifest.yml
 contentdir: ./dist
-buildscript: |
-  set -e
-  rm -rf dist
-  mkdir dist
-  cp src/cmd/haos-vm/guest/prepare.sh dist/
-  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C src build -trimpath -o ../dist/haos-vm ./cmd/haos-vm
+buildscript: ./build.sh
 pkgout: ./
 icon: ./lzc-icon.png
 compose_override:

@@ -1,0 +1,6 @@
+{{range .Mounts -}}
+{{.Tag}} {{.Target}} 9p rw,trans=virtio,version=9p2000.L,msize=262144,x-systemd.required-by=docker.service,x-systemd.before=docker.service 0 0
+{{end -}}
+{{if .OIDC -}}
+haosoidc /run/haos-oidc 9p ro,nodev,nosuid,trans=virtio,version=9p2000.L,msize=262144,x-systemd.wanted-by=docker.service,x-systemd.before=docker.service 0 0
+{{end -}}

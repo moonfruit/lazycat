@@ -1,9 +1,10 @@
-package main
+package vm
 
 import (
 	"embed"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/netip"
 	"os"
 	"strconv"
@@ -38,6 +39,7 @@ type vmConfig struct {
 	bridge                     netip.Prefix
 	lan, lanMAC, managementMAC string
 	disk, code, variables      string
+	oidc                       *oidcClient
 }
 
 func readConfig() (vmConfig, error) {
@@ -68,6 +70,11 @@ func readConfig() (vmConfig, error) {
 		}
 		c.host = ip
 	}
+	var err error
+	c.oidc, err = readOIDCClient()
+	if err != nil {
+		log.Printf("OIDC unavailable, continuing with local authentication: %v", err)
+	}
 	return c, nil
 }
 
@@ -83,14 +90,19 @@ var guestTemplateFiles embed.FS
 
 var guestTemplates = template.Must(template.ParseFS(guestTemplateFiles, "guest/*.tmpl"))
 
-//go:embed guest/prepare.conf
-var dockerDropIn string
+//go:embed guest/haos-lpk-oidc.service
+var oidcService string
 
 type guestTemplateData struct {
 	GuestCIDR, Gateway, AppSubnet, HostRoute string
+	ManagementIPv6                           string
 	CreatedAt                                string
 	Mounts                                   []documentMount
+	OIDC                                     bool
 }
+
+// Private to the QEMU user-mode management link. LAN supplies the default routes.
+const managementIPv6 = "fd97:42b6:7a61:2::"
 
 func (data guestTemplateData) render(name string) (string, error) {
 	var output strings.Builder
@@ -102,11 +114,13 @@ func (data guestTemplateData) render(name string) (string, error) {
 
 func (c vmConfig) systemdCredentials(prefix string) ([]string, error) {
 	data := guestTemplateData{
-		GuestCIDR: prefix + "15/24",
-		Gateway:   prefix + "2",
-		AppSubnet: c.bridge.Masked().String(),
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		Mounts:    documentMounts,
+		GuestCIDR:      prefix + "15/24",
+		Gateway:        prefix + "2",
+		AppSubnet:      c.bridge.Masked().String(),
+		CreatedAt:      time.Now().UTC().Format(time.RFC3339),
+		Mounts:         documentMounts,
+		OIDC:           c.oidc != nil,
+		ManagementIPv6: managementIPv6,
 	}
 	if c.host.IsValid() {
 		data.HostRoute = c.host.String() + "/32"
@@ -123,16 +137,24 @@ func (c vmConfig) systemdCredentials(prefix string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	dockerDropIn, err := data.render("prepare.conf.tmpl")
+	if err != nil {
+		return nil, err
+	}
 	encode := func(s string) string { return base64.StdEncoding.EncodeToString([]byte(s)) }
 	tmpfiles := "f~ /run/NetworkManager/system-connections/haos-lpk-mgmt.nmconnection 0600 root root - " + encode(profile) + "\n"
 	tmpfiles += "f~ /run/haos-lpk-http.json 0600 root root - " + encode(httpConfig) + "\n"
 	const smbios = "type=11,value=io.systemd.credential.binary:"
-	return []string{
+	args := []string{
 		"-smbios", smbios + "fstab.extra=" + encode(fstab),
 		"-smbios", smbios + "tmpfiles.extra=" + encode(tmpfiles),
 		"-fw_cfg", "name=opt/haos-lpk/prepare,file=/lzcapp/pkg/content/prepare.sh",
 		"-smbios", smbios + "systemd.unit-dropin.docker.service~haos-lpk=" + encode(dockerDropIn),
-	}, nil
+	}
+	if data.OIDC {
+		args = append(args, "-smbios", smbios+"systemd.extra-unit.haos-lpk-oidc.service="+encode(oidcService))
+	}
+	return args, nil
 }
 
 func (c vmConfig) qemuArgs() ([]string, error) {
@@ -140,6 +162,10 @@ func (c vmConfig) qemuArgs() ([]string, error) {
 	credentials, err := c.systemdCredentials(prefix)
 	if err != nil {
 		return nil, err
+	}
+	families := "ipv6=off"
+	if c.oidc != nil {
+		families = "ipv4=on,ipv6=on,ipv6-net=" + managementIPv6 + "/64"
 	}
 	args := []string{
 		"-name", "haos", "-machine", "q35,accel=kvm", "-cpu", "host",
@@ -150,7 +176,7 @@ func (c vmConfig) qemuArgs() ([]string, error) {
 		"-device", "virtio-blk-pci,drive=os,bus=pcie.0,addr=0x3,bootindex=1",
 		"-netdev", "vde,id=lan,sock=pcap://" + c.lan,
 		"-device", "virtio-net-pci,netdev=lan,bus=pcie.0,addr=0x1,mac=" + c.lanMAC,
-		"-netdev", "user,id=mgmt,net=" + prefix + "0/24,ipv6=off,hostfwd=tcp:" + c.bridge.Addr().String() + ":8123-" + prefix + "15:80",
+		"-netdev", "user,id=mgmt,net=" + prefix + "0/24," + families + ",hostfwd=tcp:" + c.bridge.Addr().String() + ":8123-" + prefix + "15:80",
 		"-device", "virtio-net-pci,netdev=mgmt,bus=pcie.0,addr=0x2,mac=" + c.managementMAC,
 		"-device", "virtio-serial-pci,id=guestserial,bus=pcie.0,addr=0x5",
 		"-chardev", "socket,id=agent,path=" + agentSocket + ",server=on,wait=off",
@@ -162,6 +188,11 @@ func (c vmConfig) qemuArgs() ([]string, error) {
 		args = append(args, "-fsdev",
 			fmt.Sprintf("local,id=%s,path=/proc/self/fd/%d,security_model=mapped-xattr,fmode=0644,dmode=0755", mount.Tag, i+3),
 			"-device", fmt.Sprintf("virtio-9p-pci,fsdev=%s,mount_tag=%s,bus=pcie.0,addr=0x%x", mount.Tag, mount.Tag, mount.slot))
+	}
+	if c.oidc != nil {
+		args = append(args,
+			"-fsdev", "local,id=haosoidc,path="+oidcExportDir+",security_model=none,readonly=on",
+			"-device", "virtio-9p-pci,fsdev=haosoidc,mount_tag=haosoidc,bus=pcie.0,addr=0x9")
 	}
 	return append(args, credentials...), nil
 }

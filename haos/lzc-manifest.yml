@@ -1,5 +1,6 @@
 application:
   subdomain: haos
+  oidc_redirect_path: /auth/oidc/callback
   background_task: true
   kvm_accel: true
   multi_instance: false
@@ -17,3 +18,6 @@ services:
       - {{ printf "HAOS_MEMORY_MIB=%s" (or .U.MemoryMiB "4096") | printf "%q" }}
       - {{ printf "HAOS_HOST_IP=%s" (or .U.HostIP "") | printf "%q" }}
       - {{ printf "HAOS_OWNER=%s" .U.Owner | printf "%q" }}
+      - LAZYCAT_AUTH_OIDC_CLIENT_ID=${LAZYCAT_AUTH_OIDC_CLIENT_ID}
+      - LAZYCAT_AUTH_OIDC_CLIENT_SECRET=${LAZYCAT_AUTH_OIDC_CLIENT_SECRET}
+      - LAZYCAT_AUTH_OIDC_ISSUER_URI=${LAZYCAT_AUTH_OIDC_ISSUER_URI}

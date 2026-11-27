@@ -1,6 +1,4 @@
-//go:build linux
-
-package main
+package vm
 
 import (
 	"context"
@@ -9,25 +7,12 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"syscall"
 )
 
-func main() {
-	log.SetFlags(0)
-	log.SetPrefix("haos: ")
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	status, err := run(ctx)
-	cancel()
-	if err != nil {
-		log.Print(err)
-		os.Exit(1)
-	}
-	os.Exit(status)
-}
-
-func run(ctx context.Context) (int, error) {
+// Run starts QEMU and returns its exit status after shutdown.
+func Run(ctx context.Context) (int, error) {
 	syscall.Umask(0077)
 	c, err := readConfig()
 	if err != nil {
@@ -87,6 +72,13 @@ func run(ctx context.Context) (int, error) {
 	}
 	if err := configureLAN(ctx, c.lan, c.lanMAC); err != nil {
 		return 0, setupError(ctx, err)
+	}
+	if c.oidc != nil {
+		defer os.RemoveAll(oidcExportDir)
+		if err := c.prepareOIDCExport(oidcExportDir, "/lzcapp/pkg/content"); err != nil {
+			log.Printf("could not prepare OIDC guest files, continuing with local authentication: %v", err)
+			c.oidc = nil
+		}
 	}
 	if ctx.Err() != nil {
 		return 0, nil

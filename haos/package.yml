@@ -1,5 +1,5 @@
 package: com.github.moonfruit.haos
-version: 0.4.2
+version: 0.5.0
 name: Home Assistant OS
 description: 在独立的 x86-64 虚拟机中运行的 Home Assistant OS
 homepage: https://www.home-assistant.io/

@@ -1,0 +1,6 @@
+client_id: !secret client_id
+client_secret: !secret client_secret
+discovery_url: !secret discovery_url
+display_name: 懒猫微服
+roles:
+  admin: ADMIN

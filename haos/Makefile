@@ -3,7 +3,7 @@
 
 all: app.lpk
 
-app.lpk: lzc-* package.yml $(shell find src -type f)
+app.lpk: lzc-* package.yml build.sh hass-oidc-auth.lock hass-oidc-auth.LICENSE.md $(shell find src -type f)
 	lzc-cli project build -o app.lpk
 
 install: app.lpk

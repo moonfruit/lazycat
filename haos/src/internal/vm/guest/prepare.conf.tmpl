@@ -1,6 +1,11 @@
 [Unit]
 RequiresMountsFor=/mnt/data/supervisor
 After=systemd-tmpfiles-setup.service
-
+{{if .OIDC -}}
+Wants=haos-lpk-oidc.service
+{{end}}
 [Service]
+{{if .OIDC -}}
+ExecStartPre=-/run/haos-oidc/haos-vm oidc --recover
+{{end -}}
 ExecStartPre=/bin/sh /sys/firmware/qemu_fw_cfg/by_name/opt/haos-lpk/prepare/raw /mnt/data/supervisor /run/haos-lpk-http.json

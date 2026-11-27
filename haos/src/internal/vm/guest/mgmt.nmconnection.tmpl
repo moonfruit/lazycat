@@ -15,4 +15,12 @@ route2={{.HostRoute}},{{.Gateway}}
 {{end}}
 
 [ipv6]
+{{if .OIDC -}}
+method=manual
+address1={{.ManagementIPv6}}15/64
+never-default=true
+route1=fc03:1136:3800::/40,{{.ManagementIPv6}}2
+route1_options=src={{.ManagementIPv6}}15
+{{else -}}
 method=disabled
+{{end -}}

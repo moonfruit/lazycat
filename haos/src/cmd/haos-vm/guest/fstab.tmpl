@@ -1,3 +1,0 @@
-{{range .Mounts -}}
-{{.Tag}} {{.Target}} 9p rw,trans=virtio,version=9p2000.L,msize=262144,x-systemd.required-by=docker.service,x-systemd.before=docker.service 0 0
-{{end -}}

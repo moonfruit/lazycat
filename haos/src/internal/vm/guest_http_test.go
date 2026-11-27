@@ -1,4 +1,4 @@
-package main
+package vm
 
 import (
 	"encoding/json"
@@ -57,7 +57,7 @@ func TestManagedProxyNetworkChange(t *testing.T) {
 			t.Fatal(err)
 		}
 		var got, want any
-		if err := json.Unmarshal([]byte(fmt.Sprintf(settings, subnet)), &want); err != nil {
+		if err := json.Unmarshal(fmt.Appendf(nil, settings, subnet), &want); err != nil {
 			t.Fatal(err)
 		}
 		if err := json.Unmarshal(data, &got); err != nil || !reflect.DeepEqual(got, want) {
