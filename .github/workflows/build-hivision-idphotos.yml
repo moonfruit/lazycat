@@ -6,48 +6,100 @@ on:
       - main
     paths:
       - ".github/workflows/build-hivision-idphotos.yml"
+  schedule:
+    - cron: "17 22 * * *" # 06:17 Asia/Taipei
   workflow_dispatch:
+
+concurrency:
+  group: hivision-idphotos-ghcr
+  queue: max
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/hivision-idphotos
+  UPSTREAM: Zeyi-Lin/HivisionIDPhotos
 
 jobs:
+  select:
+    name: Check upstream versions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      image: ${{ steps.select.outputs.image }}
+    steps:
+      - name: Log in to GHCR to read previous builds
+        if: github.event_name == 'schedule'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Select builds
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          image="$REGISTRY/${IMAGE_NAME,,}"
+          release=$(gh api "repos/$UPSTREAM/releases/latest" --jq .tag_name)
+          commit=$(gh api "repos/$UPSTREAM/commits/master" --jq .sha)
+          [[ -n $release && $commit =~ ^[0-9a-f]{40}$ ]]
+
+          # A missing tag has no prior build. Authentication and registry errors fail the check.
+          read_label() {
+            local config
+            if config=$(skopeo inspect --override-os linux --override-arch amd64 --retry-times 2 --config \
+                "docker://$image:$1" 2>"$RUNNER_TEMP/inspect.err"); then
+              jq -r --arg key "$2" '.config.Labels[$key] // ""' <<< "$config"
+            elif ! grep -Eq 'manifest unknown|name unknown' "$RUNNER_TEMP/inspect.err"; then
+              cat "$RUNNER_TEMP/inspect.err" >&2
+              return 1
+            fi
+          }
+
+          last_release=
+          last_url=
+          if [[ $GITHUB_EVENT_NAME == schedule ]]; then
+            last_release=$(read_label release org.opencontainers.image.version)
+            last_url=$(read_label latest org.opencontainers.image.url)
+            echo "Release: upstream=$release last-built=${last_release:-none}"
+            echo "Master: upstream=$commit last-built=${last_url##*/}"
+          fi
+          matrix=$(jq -cn --arg release "$release" --arg commit "$commit" \
+            --arg last_release "$last_release" --arg last_commit "${last_url##*/}" '[
+              ({source: "release", ref: ("refs/tags/" + $release), tag: $release} | select($release != $last_release)),
+              ({source: "master", ref: $commit, tag: "latest"} | select($commit != $last_commit))
+            ]')
+          echo "Selected builds for $GITHUB_EVENT_NAME: $matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
   build-image:
     name: Build upstream ${{ matrix.source }}
+    needs: select
+    if: needs.select.outputs.matrix != '[]'
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       max-parallel: 1
       matrix:
-        source: [release, master]
+        include: ${{ fromJSON(needs.select.outputs.matrix) }}
     permissions:
       contents: read
       packages: write
       attestations: write
       id-token: write
     steps:
-      - name: Select upstream source and image tag
-        id: source
-        env:
-          SOURCE: ${{ matrix.source }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [[ $SOURCE == release ]]; then
-            tag=$(gh api repos/Zeyi-Lin/HivisionIDPhotos/releases/latest --jq .tag_name)
-            ref="refs/tags/$tag"
-          else
-            tag=latest
-            ref="refs/heads/$SOURCE"
-          fi
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
       - name: Checkout
         id: checkout
         uses: actions/checkout@v7
         with:
-          repository: Zeyi-Lin/HivisionIDPhotos
-          ref: ${{ steps.source.outputs.ref }}
+          repository: ${{ env.UPSTREAM }}
+          ref: ${{ matrix.ref }}
           persist-credentials: false
 
       - name: Set up Python
@@ -86,11 +138,11 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: type=raw,value=${{ steps.source.outputs.tag }}
-          labels: org.opencontainers.image.url=https://github.com/Zeyi-Lin/HivisionIDPhotos/tree/${{ steps.checkout.outputs.commit }}
+          images: ${{ needs.select.outputs.image }}
+          tags: type=raw,value=${{ matrix.tag }}
+          labels: org.opencontainers.image.url=https://github.com/${{ env.UPSTREAM }}/tree/${{ steps.checkout.outputs.commit }}
 
-      - name: Build and Push
+      - name: Build and push by digest
         id: build-and-push
         uses: docker/build-push-action@v7
         with:
@@ -98,22 +150,22 @@ jobs:
           cache-to: type=gha,scope=hivision-idphotos,mode=max
           context: .
           platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          outputs: type=image,name=${{ needs.select.outputs.image }},push-by-digest=true,name-canonical=true,push=true
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Generate attestation
         uses: actions/attest@v4
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-name: ${{ needs.select.outputs.image }}
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
           push-to-registry: true
 
       - name: Smoke-test published web and API services
         env:
+          IMAGE: ${{ needs.select.outputs.image }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
-          docker run --rm --entrypoint sh "$REGISTRY/${IMAGE_NAME,,}@$DIGEST" -ec '
+          docker run --rm --entrypoint sh "$IMAGE@$DIGEST" -ec '
             python -u app.py & web=$!
             python -u deploy_api.py & api=$!
             for attempt in $(seq 1 60); do
@@ -123,3 +175,15 @@ jobs:
             done
             exit 1
           '
+
+      - name: Publish verified tags and record successful build
+        env:
+          IMAGE: ${{ needs.select.outputs.image }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          TAG: ${{ steps.meta.outputs.tags }}
+          SOURCE: ${{ matrix.source }}
+        run: |
+          docker buildx imagetools create --prefer-index=false --tag "$TAG" "$IMAGE@$DIGEST"
+          if [[ $SOURCE == release ]]; then
+            docker buildx imagetools create --prefer-index=false --tag "$IMAGE:release" "$IMAGE@$DIGEST"
+          fi
