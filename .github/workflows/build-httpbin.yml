@@ -50,8 +50,12 @@ jobs:
         env:
           DIGEST: ${{ steps.candidate.outputs.digest }}
         run: |
+          index=$(docker buildx imagetools inspect --raw "$IMAGE@$DIGEST")
           for arch in amd64 arm64; do
-            bash docker/httpbin/smoke.sh "$IMAGE@$DIGEST" "$VERSION" "linux/$arch"
+            manifest=$(jq -er --arg arch "$arch" '
+              [.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch) | .digest]
+              | select(length == 1) | first' <<< "$index")
+            bash docker/httpbin/smoke.sh "$IMAGE@$manifest" "$VERSION" "linux/$arch"
           done
       - uses: actions/attest@v4
         with:
