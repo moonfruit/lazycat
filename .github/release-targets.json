@@ -1,0 +1,10 @@
+{
+  "lpk": {
+    "httpbin": {"id": 1, "package": "com.github.moonfruit.httpbin"},
+    "myip": {"id": 2, "package": "com.github.moonfruit.myip"}
+  },
+  "images": {
+    "aria2": {"versionEnv": "ARIA2_VERSION"},
+    "crond": {"versionEnv": "CURL_VERSION"}
+  }
+}

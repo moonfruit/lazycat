@@ -1,0 +1,64 @@
+name: Build and verify a registered LPK
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        required: true
+        type: string
+      revision:
+        required: true
+        type: string
+      has_updates:
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    env:
+      APP: ${{ inputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        if: inputs.has_updates
+        with:
+          name: lpk-updates
+          path: ${{ runner.temp }}
+      - if: inputs.has_updates
+        run: git apply "$RUNNER_TEMP/lpk-updates.patch"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm install -g @lazycatcloud/lzc-cli@2.0.9
+      - uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+      - name: Build once and check the packaged manifest on both architectures
+        shell: bash
+        run: |
+          lpk="$RUNNER_TEMP/$APP.lpk"
+          package=$(jq -er --arg app "$APP" '.lpk[$app].package' .github/release-targets.json)
+          version=$(yq -er '.version' "$APP/package.yml")
+          lzc-cli project build "$APP" -o "$lpk"
+          lzc-cli lpk info "$lpk" | tee "$RUNNER_TEMP/lpk-info"
+          grep -Fx 'lpk_version: v2' "$RUNNER_TEMP/lpk-info"
+          grep -Fx "package: $package" "$RUNNER_TEMP/lpk-info"
+          grep -Fx "version: $version" "$RUNNER_TEMP/lpk-info"
+          tar -xOf "$lpk" manifest.yml > "$RUNNER_TEMP/manifest.yml"
+          for arch in amd64 arm64; do
+            bash "scripts/lpk/smoke-$APP.sh" "$RUNNER_TEMP/manifest.yml" "linux/$arch" "$version"
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: lpk-package-${{ inputs.app }}
+          path: ${{ runner.temp }}/${{ inputs.app }}.lpk
+          if-no-files-found: error
+          overwrite: true

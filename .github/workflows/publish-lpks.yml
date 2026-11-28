@@ -1,0 +1,148 @@
+name: Publish LPKs and software source
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '43 21 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Registered LPK slug, or all
+        type: string
+        default: all
+      check_upstream:
+        description: Check upstream and skip versions already in the catalog
+        type: boolean
+        default: false
+
+concurrency:
+  group: lpk-source-production
+  queue: max
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    outputs:
+      targets: ${{ steps.plan.outputs.targets }}
+      revision: ${{ steps.plan.outputs.revision }}
+      patch: ${{ steps.plan.outputs.patch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select public LPKs
+        id: select
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          TARGET: ${{ inputs.target || 'all' }}
+        run: |
+          selected=$(python3 scripts/ci/select-targets.py lpk)
+          echo "selected=$selected" >> "$GITHUB_OUTPUT"
+      - name: Check versions and select builds
+        id: plan
+        env:
+          SELECTED: ${{ steps.select.outputs.selected }}
+          EVENT: ${{ github.event_name }}
+          CHECK_UPSTREAM: ${{ github.event_name == 'schedule' || inputs.check_upstream }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/lpk/prepare.sh
+      - uses: actions/upload-artifact@v7
+        if: steps.plan.outputs.patch == 'true'
+        with:
+          name: lpk-updates
+          path: ${{ runner.temp }}/lpk-updates.patch
+          if-no-files-found: error
+          overwrite: true
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.targets != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.prepare.outputs.targets) }}
+    uses: ./.github/workflows/verify-lpk.yml
+    with:
+      app: ${{ matrix.app }}
+      revision: ${{ needs.prepare.outputs.revision }}
+      has_updates: ${{ needs.prepare.outputs.patch == 'true' }}
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.revision }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: lpk-package-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/lpks
+      - uses: actions/download-artifact@v8
+        if: needs.prepare.outputs.patch == 'true'
+        with:
+          name: lpk-updates
+          path: ${{ runner.temp }}
+      - name: Record tested versions and publish the verified artifacts
+        env:
+          TARGETS: ${{ needs.prepare.outputs.targets }}
+          HAS_UPDATES: ${{ needs.prepare.outputs.patch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -t apps < <(jq -r '.[]' <<< "$TARGETS")
+          bash scripts/lpk/record.sh "${apps[@]}"
+          RELEASE_SHA=$(git rev-parse HEAD)
+          export RELEASE_SHA
+          for app in "${apps[@]}"; do
+            bash scripts/lpk/publish.sh "$app" "$RUNNER_TEMP/lpks/$app.lpk"
+          done
+
+  index:
+    needs: release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      - id: pages
+        uses: actions/configure-pages@v6
+      - name: Build the catalog and verify public downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: python3 scripts/lpk/source.py "$BASE_URL" site/source/v2/index.json
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: index
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5

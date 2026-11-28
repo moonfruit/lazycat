@@ -1,0 +1,169 @@
+name: Build registered Docker images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker/**"
+      - ".github/release-targets.json"
+      - ".github/workflows/build-images.yml"
+      - "scripts/ci/**"
+      - "scripts/images/**"
+  schedule:
+    - cron: "29 22 * * *" # 06:29 Asia/Taipei
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Registered image name, or all"
+        type: string
+        default: all
+
+concurrency:
+  group: registered-image-releases
+  queue: max
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    outputs:
+      targets: ${{ steps.prepare.outputs.targets }}
+      repairs: ${{ steps.prepare.outputs.repairs }}
+      sha: ${{ steps.prepare.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Log in to GHCR to check published images
+        if: github.event_name == 'schedule'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Select images and refresh scheduled pins
+        id: prepare
+        env:
+          EVENT: ${{ github.event_name }}
+          TARGET: ${{ inputs.target || 'all' }}
+          BEFORE: ${{ github.event.before }}
+        run: scripts/images/prepare.sh
+
+  build:
+    name: Build ${{ matrix.image }}
+    needs: prepare
+    if: needs.prepare.outputs.targets != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.prepare.outputs.targets) }}
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    env:
+      TARGET: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - name: Read image name, version and source
+        run: |
+          version=$(scripts/images/version.sh "$TARGET")
+          source_id=$(scripts/images/source-id.sh "$TARGET")
+          {
+            echo "VERSION=$version"
+            echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$TARGET"
+            echo "SOURCE_ID=$source_id"
+          } >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: type=raw,value=${{ env.VERSION }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.sha }}
+            io.github.moonfruit.image-source=${{ env.SOURCE_ID }}
+
+      - name: Build and upload candidate by digest
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/${{ matrix.image }}
+          platforms: linux/amd64
+          pull: true
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Smoke-test candidate
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: '"docker/$TARGET/smoke.sh" "$IMAGE@$DIGEST"'
+
+      - name: Attest verified image
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Publish version and latest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: scripts/images/promote.sh "$TARGET" "$DIGEST" "$VERSION" latest
+
+  repair:
+    name: Restore version tag for ${{ matrix.name }}
+    needs: prepare
+    if: needs.prepare.outputs.repairs != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.repairs) }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore version tag from verified latest digest
+        env:
+          TARGET: ${{ matrix.name }}
+          DIGEST: ${{ matrix.digest }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$TARGET"
+          latest=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://$image:latest")
+          if [[ $latest != "$DIGEST" ]]; then
+            echo "The latest tag moved since selection. Deferring repair."
+            exit 0
+          fi
+          version=$(scripts/images/version.sh "$TARGET")
+          scripts/images/promote.sh "$TARGET" "$DIGEST" "$version"

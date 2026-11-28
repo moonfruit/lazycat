@@ -1,10 +1,10 @@
 all: app.lpk
 
-.PHONY: update
+.PHONY: all update clean install uninstall
 update:
 	./update.sh
 
-app.lpk: lzc-*
+app.lpk: lzc-* package.yml
 	lzc-cli project build -o app.lpk
 
 clean:
@@ -14,4 +14,4 @@ install: app.lpk
 	lzc-cli app install app.lpk
 
 uninstall:
-	lzc-cli app uninstall `yq .package lzc-manifest.yml`
+	lzc-cli app uninstall "$$(yq -er '.package' package.yml)"

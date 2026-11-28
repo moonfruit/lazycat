@@ -1,31 +1,11 @@
 #!/usr/bin/env bash
-if [[ -z "$PROXY_ENABLED" ]] && hash proxy 2>/dev/null; then
+set -euo pipefail
+if [[ -z ${PROXY_ENABLED:-} ]] && hash proxy 2>/dev/null; then
     exec proxy "$0" "$@"
 fi
 
-source "$ENV/lib/bash/docker.sh"
-
-echo " --- === Updating alpine === ---"
-ALPINE=$(find-image-latest-version alpine)
-sed -e 's|\(alpine:\).*|\1'"$ALPINE"'|' -i Dockerfile
-echo "Using version: $ALPINE"
-echo
-
-echo " --- === Updating busybox === ---"
-VERSION=$(find-alpine-package-version busybox-suid "${ALPINE%.*}")
-sed -e 's|\(BUSYBOX_VERSION=\)[^ ]*|\1'"$VERSION"'|' -i Dockerfile
-echo "Using version: $VERSION"
-echo
-
-echo " --- === Updating curl === ---"
-VERSION=$(find-alpine-package-version curl "${ALPINE%.*}")
-sed -e 's|\(CURL_VERSION=\)[^ ]*|\1'"$VERSION"'|' -i Dockerfile
-echo "Using version: $VERSION"
-echo
-
-if [[ $1 != "-N" ]]; then
-    if ! git diff --quiet Dockerfile; then
-        echo " --- === Result === ---"
-        git diff Dockerfile
-    fi
+cd "$(dirname "$0")"
+../../scripts/images/update-alpine.py BUSYBOX_VERSION=main/busybox-suid CURL_VERSION=main/curl
+if [[ ${1:-} != "-N" ]]; then
+    git diff -- Dockerfile
 fi
