@@ -45,13 +45,13 @@ lzc-cli app install app.lpk
 | 从哪里访问 | 地址 |
 |---|---|
 | 懒猫客户端 | 打开 Home Assistant OS 应用，在 HA 登录页选择「懒猫微服」使用当前懒猫账号 |
-| 局域网其他物理设备 | 路由器分配的 HAOS 地址，例如 `http://<HAOS-LAN-IP>/` |
+| 局域网其他物理设备 | `http://<HAOS-LAN-IP>/` 或 `http://<HAOS-LAN-IP>:8123/` |
 | 家庭 Wi-Fi 或 Tailscale 子网路由 | 设置物理网卡转发后，两种网络都使用 `http://<盒子局域网IP>:39128/` |
 | HAOS 访问宿主 SMB/WebDAV | 使用自动识别或手动指定的宿主局域网地址，已有共享按原有凭据认证 |
 
 在懒猫的「局域网端口转发工具」添加 TCP 规则，入口选物理网卡，目标选「微服应用 → Home Assistant OS → qemu」，目标端口填 `8123`。例如在 dkmooncat 监听 `enp2s0 · 192.168.50.11:39128`。HAOS 包只提供内部服务端口，宿主端口由转发工具分配。手机经 Tailscale 访问时需要盒子发布对应的 LAN 子网路由，并允许手机访问该端口。Companion App 对 HTTP 外部地址的支持取决于连接安全设置。[端口转发工具](https://lazycat.cloud/appstore/detail/cloud.lazycat.app.forward) · [Companion App 连接设置](https://companion.home-assistant.io/docs/getting_started/connection-security-level/)
 
-HAOS 的 LAN 地址监听 80，局域网设备可以直接访问。LAN 和 TCP 转发入口使用 HA 自身认证，首次安装时请完成 HA 用户注册。
+Home Assistant 在虚拟机内监听 TCP 80。HAOS 启动时会加载 nftables 规则，把从局域网网卡 `enp0s1` 发往本机 TCP 8123 的连接转到 80，保留客户端源地址。使用固定端口的客户端可以直接访问 `http://homeassistant.local:8123/`（需要局域网支持 mDNS）。两个端口都支持 WebSocket，使用同一套 HA 认证。
 
 ### 懒猫账号登录
 

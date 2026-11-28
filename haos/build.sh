@@ -32,4 +32,5 @@ rm -rf dist
 mkdir dist
 install -m 644 "$archive" dist/hass-oidc-auth.zip
 cp hass-oidc-auth.LICENSE.md src/internal/vm/guest/prepare.sh dist/
+cp src/internal/vm/guest/lan-http.nft dist/
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C src build -trimpath -o ../dist/haos-vm .

@@ -1,0 +1,8 @@
+# Docker may restart during a single HAOS boot. Replace only our own table.
+destroy table inet haos_lpk_lan_http
+table inet haos_lpk_lan_http {
+    chain prerouting {
+        type nat hook prerouting priority dstnat - 1; policy accept;
+        iifname "enp0s1" fib daddr type local tcp dport 8123 counter redirect to :80
+    }
+}

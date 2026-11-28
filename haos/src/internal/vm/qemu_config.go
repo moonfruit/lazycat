@@ -149,6 +149,7 @@ func (c vmConfig) systemdCredentials(prefix string) ([]string, error) {
 		"-smbios", smbios + "fstab.extra=" + encode(fstab),
 		"-smbios", smbios + "tmpfiles.extra=" + encode(tmpfiles),
 		"-fw_cfg", "name=opt/haos-lpk/prepare,file=/lzcapp/pkg/content/prepare.sh",
+		"-fw_cfg", "name=opt/haos-lpk/lan-http,file=/lzcapp/pkg/content/lan-http.nft",
 		"-smbios", smbios + "systemd.unit-dropin.docker.service~haos-lpk=" + encode(dockerDropIn),
 	}
 	if data.OIDC {

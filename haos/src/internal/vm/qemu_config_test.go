@@ -47,6 +47,10 @@ func TestGuestRoutesAndBackup(t *testing.T) {
 				!strings.Contains(line, "name=opt/haos-lpk/prepare,file=/lzcapp/pkg/content/prepare.sh") {
 				t.Error("missing first-start provisioning before Docker")
 			}
+			if !strings.Contains(credentials["systemd.unit-dropin.docker.service~haos-lpk"], "ExecStartPre=-/usr/sbin/nft -f /sys/firmware/qemu_fw_cfg/by_name/opt/haos-lpk/lan-http/raw\n") ||
+				!strings.Contains(line, "name=opt/haos-lpk/lan-http,file=/lzcapp/pkg/content/lan-http.nft") {
+				t.Error("missing guest LAN port forwarding rules at Docker startup")
+			}
 			for name, content := range credentials {
 				if strings.Contains(name, "oidc") || strings.Contains(content, "haos-lpk-oidc") || strings.Contains(content, "/run/haos-oidc") {
 					t.Fatalf("unexpected OIDC unit or dependency with OIDC disabled: %s", name)
