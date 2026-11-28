@@ -1,20 +1,32 @@
 #!/usr/bin/env bash
-if [[ -z "$PROXY_ENABLED" ]] && hash proxy 2>/dev/null; then
+set -euo pipefail
+if [[ -z ${PROXY_ENABLED:-} ]] && command -v proxy >/dev/null; then
     exec proxy "$0" "$@"
 fi
+cd "$(dirname "$0")"
 
-source "$ENV/lib/bash/github.sh"
+upstream=linzeyi/hivision_idphotos
+tag=$(skopeo list-tags "docker://docker.io/$upstream" | jq -er '
+    [.Tags[] | select(test("^v(0|[1-9][0-9]*)([.](0|[1-9][0-9]*)){2}$"))]
+    | max_by(ltrimstr("v") | split(".") | map(tonumber)) // error("No stable Hivision image tag found")
+')
+export LPK_VERSION=${tag#v}
+export LPK_IMAGE="$upstream:$tag"
 
-echo " --- === Updating HivisionIDPhotos === ---"
-VERSION=$(find-latest-version Zeyi-Lin HivisionIDPhotos)
-sed -e 's|\(image: linzeyi/hivision_idphotos:v\).*|\1'"$VERSION"'|' \
-    -i lzc-manifest.yml
-echo "Using version: $VERSION"
-echo
-
-if [[ $1 != "-N" ]]; then
-    if ! git diff --quiet lzc-manifest.yml; then
-        echo " --- === Result === ---"
-        git diff lzc-manifest.yml
-    fi
+web_image=$(yq -er '.services.hivision.image' lzc-manifest.yml)
+api_image=$(yq -er '.services.hivision_api.image' lzc-manifest.yml)
+version=$(yq -er '.version' package.yml)
+if [[ $(printf '%s\n' "$version" "$LPK_VERSION" | sort -V | tail -1) != "$LPK_VERSION" ]]; then
+    echo "Latest stable image $tag is older than the current LPK $version" >&2
+    exit 1
+fi
+if [[ $web_image != "$LPK_IMAGE" || $api_image != "$LPK_IMAGE" ]]; then
+    yq -i '.services.hivision.image = strenv(LPK_IMAGE) | .services.hivision_api.image = strenv(LPK_IMAGE)' lzc-manifest.yml
+fi
+if [[ $version != "$LPK_VERSION" ]]; then
+    yq -i '.version = strenv(LPK_VERSION)' package.yml
+fi
+echo "HivisionIDPhotos $LPK_VERSION ($LPK_IMAGE)"
+if [[ ${1:-} != -N ]]; then
+    git diff -- lzc-manifest.yml package.yml
 fi

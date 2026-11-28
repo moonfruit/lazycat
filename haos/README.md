@@ -15,7 +15,7 @@
 
 在仓库根运行 `./docker/qemu/update.sh` 可更新 QEMU 上游版本，根目录的 `./update.sh` 也会调用它。CI 每周一重新拉取 `debian:trixie-slim`，安装与上游版本匹配的最新 Debian 修订。CI 对比最终文件系统和运行配置，有实质变化时才发布 `<QEMU版本>-rN`，同时更新上游版本标签和 `latest`。文件时间、镜像构建时间和归档顺序不计入比较。[更新脚本](../docker/qemu/update.sh) · [GitHub Actions 工作流](../.github/workflows/build-qemu.yml)
 
-在本目录执行 `make update` 可以更新初装镜像、QEMU 和新实例使用的 OIDC 插件版本。脚本读取 HAOS 稳定渠道中 OVA 的版本，核对对应 QCOW2 压缩包的 SHA-256，选择 GHCR 已发布的最新 QEMU 修订，并记录插件正式发布包的版本和 SHA-256。`make` 在构建时下载并校验插件，有有效缓存时直接复用。LPK 版本由 `package.yml` 单独管理。[LPK 更新脚本](update.sh)
+在本目录执行 `make update` 可以更新初装镜像、QEMU 和新实例使用的 OIDC 插件版本。脚本读取 HAOS 稳定渠道的 OVA 版本及对应 QCOW2 压缩包的 SHA-256，选择 GHCR 已发布的最新 QEMU 修订，并记录 OIDC 插件正式发布包的版本、SHA-256 和许可证。上述依赖有变化时，一个更新提交会将 `package.yml` 中的 LPK 补丁版本递增一次。本地启动器或打包配置有改动时，请一并更新 LPK 版本。`make` 在构建时下载并校验插件，有有效缓存时直接复用。[LPK 更新脚本](update.sh)
 
 构建并安装：
 
@@ -24,7 +24,7 @@ make
 lzc-cli app install app.lpk
 ```
 
-应用使用 host 的有线网口 `enp2s0` 接入局域网，接口名固定在 `lzc-build.yml` 中。
+发布包使用宿主的有线网口 `enp2s0` 接入局域网。其他网口名称需要在 `lzc-build.yml` 的 `compose_override.networks.haoslan.driver_opts.parent` 中填写实际接口名，再重新构建 LPK。
 
 安装时选择文稿所属用户，按需调整 CPU 和内存。`HostIP` 留空即可。每次启动应用时，启动器根据 macvlan 的父接口索引和网络命名空间，通过 Linux rtnetlink 读取物理网口的主 IPv4。网口有多个主 IPv4 或查询失败时，应用记录原因，HAOS 继续启动。手填地址会覆盖自动识别结果。此参数仅用于访客回连宿主。应用包名为 `com.github.moonfruit.haos`，子域名为 `haos`。首次进入 Home Assistant 后，建立新的家庭或使用 HA 的备份恢复向导。
 

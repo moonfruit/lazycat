@@ -33,29 +33,56 @@ jobs:
           path: ${{ runner.temp }}
       - if: inputs.has_updates
         run: git apply "$RUNNER_TEMP/lpk-updates.patch"
+      - name: Read supported test architectures
+        id: platforms
+        run: |
+          architectures=$(jq -cer --arg app "$APP" '
+            .lpk[$app].architectures // ["amd64","arm64"]
+            | select(type == "array" and length > 0 and all(.[]; . == "amd64" or . == "arm64"))
+          ' .github/release-targets.json)
+          echo "architectures=$architectures" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@v7
+        if: inputs.app == 'haos'
+        with:
+          go-version-file: haos/src/go.mod
+          cache-dependency-path: haos/src/go.sum
+      - name: Test the HAOS guest launcher on Linux
+        if: inputs.app == 'haos'
+        run: |
+          if ! command -v qemu-img >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends qemu-utils
+          fi
+          command -v qemu-img && command -v xz && command -v jq
+          go -C haos/src test ./...
+          go -C haos/src vet ./...
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           package-manager-cache: false
       - run: npm install -g @lazycatcloud/lzc-cli@2.0.9
       - uses: docker/setup-qemu-action@v4
+        if: contains(fromJSON(steps.platforms.outputs.architectures), 'arm64')
         with:
           platforms: arm64
-      - name: Build once and check the packaged manifest on both architectures
+      - name: Build once and test the published package on its supported architectures
+        env:
+          ARCHITECTURES: ${{ steps.platforms.outputs.architectures }}
         shell: bash
         run: |
           lpk="$RUNNER_TEMP/$APP.lpk"
           package=$(jq -er --arg app "$APP" '.lpk[$app].package' .github/release-targets.json)
           version=$(yq -er '.version' "$APP/package.yml")
-          lzc-cli project build "$APP" -o "$lpk"
+          # lzc-cli resolves deployment parameters relative to the project directory.
+          (cd "$APP" && lzc-cli project build -o "$lpk")
           lzc-cli lpk info "$lpk" | tee "$RUNNER_TEMP/lpk-info"
           grep -Fx 'lpk_version: v2' "$RUNNER_TEMP/lpk-info"
           grep -Fx "package: $package" "$RUNNER_TEMP/lpk-info"
           grep -Fx "version: $version" "$RUNNER_TEMP/lpk-info"
           tar -xOf "$lpk" manifest.yml > "$RUNNER_TEMP/manifest.yml"
-          for arch in amd64 arm64; do
-            bash "scripts/lpk/smoke-$APP.sh" "$RUNNER_TEMP/manifest.yml" "linux/$arch" "$version"
-          done
+          while IFS= read -r arch; do
+            bash "scripts/lpk/smoke-$APP.sh" "$RUNNER_TEMP/manifest.yml" "linux/$arch" "$version" "$lpk"
+          done < <(jq -r '.[]' <<< "$ARCHITECTURES")
       - uses: actions/upload-artifact@v7
         with:
           name: lpk-package-${{ inputs.app }}

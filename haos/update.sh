@@ -36,6 +36,13 @@ gh api -H 'Accept: application/vnd.github.raw+json' \
 test -s "$oidc_license"
 
 storage=src/internal/vm/storage_linux.go
+current=$(yq -er .version package.yml)
+committed=$(git show HEAD:./package.yml | yq -er .version)
+if ! [[ $current =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    echo "Invalid HAOS LPK version: $current" >&2
+    exit 1
+fi
+next="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
 # BSD sed requires a separate argument for the empty backup suffix.
 sed_flags=(-E -i)
 if ! sed --version >/dev/null 2>&1; then
@@ -58,8 +65,19 @@ if ! cmp -s "$oidc_license" hass-oidc-auth.LICENSE.md; then
 fi
 printf '%s %s\n' "${oidc_tag#v}" "$oidc_digest" > hass-oidc-auth.lock
 
+# Compare the pins to the last commit so a retry after a partial local update
+# still records one version, including when several dependencies changed.
+if [[ $current == "$committed" ]] && {
+    ! git diff --quiet HEAD -G '^const imageVersion = |^[[:space:]]+digest:[[:space:]]+"' -- "$storage" ||
+    ! git diff --quiet HEAD -G '^    image: ghcr.io/moonfruit/qemu:' -- lzc-manifest.yml ||
+    ! git diff --quiet HEAD -- hass-oidc-auth.lock hass-oidc-auth.LICENSE.md
+}; then
+    LPK_VERSION="$next" yq -i '.version = strenv(LPK_VERSION)' package.yml
+    echo "HAOS LPK $current -> $next"
+fi
+
 echo "HAOS OVA $version ($digest), QEMU $qemu"
 echo "hass-oidc-auth $oidc_tag ($oidc_digest)"
 if [[ ${1:-} != -N ]]; then
-    git diff -- "$storage" lzc-manifest.yml lzc-deploy-params.yml README.md hass-oidc-auth.lock hass-oidc-auth.LICENSE.md
+    git diff -- package.yml "$storage" lzc-manifest.yml lzc-deploy-params.yml README.md hass-oidc-auth.lock hass-oidc-auth.LICENSE.md
 fi

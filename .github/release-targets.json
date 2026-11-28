@@ -1,7 +1,9 @@
 {
   "lpk": {
     "httpbin": {"id": 1, "package": "com.github.moonfruit.httpbin"},
-    "myip": {"id": 2, "package": "com.github.moonfruit.myip"}
+    "myip": {"id": 2, "package": "com.github.moonfruit.myip"},
+    "haos": {"id": 3, "package": "com.github.moonfruit.haos", "architectures": ["amd64"]},
+    "hivision-idphotos": {"id": 4, "package": "com.github.moonfruit.hivision-idphotos"}
   },
   "images": {
     "aria2": {"versionEnv": "ARIA2_VERSION"},

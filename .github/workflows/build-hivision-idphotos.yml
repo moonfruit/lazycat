@@ -6,8 +6,6 @@ on:
       - main
     paths:
       - ".github/workflows/build-hivision-idphotos.yml"
-  schedule:
-    - cron: "17 22 * * *" # 06:17 Asia/Taipei
   workflow_dispatch:
 
 concurrency:
@@ -25,19 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: read
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
       image: ${{ steps.select.outputs.image }}
     steps:
-      - name: Log in to GHCR to read previous builds
-        if: github.event_name == 'schedule'
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Select builds
         id: select
         env:
@@ -49,30 +38,9 @@ jobs:
           commit=$(gh api "repos/$UPSTREAM/commits/master" --jq .sha)
           [[ -n $release && $commit =~ ^[0-9a-f]{40}$ ]]
 
-          # A missing tag has no prior build. Authentication and registry errors fail the check.
-          read_label() {
-            local config
-            if config=$(skopeo inspect --override-os linux --override-arch amd64 --retry-times 2 --config \
-                "docker://$image:$1" 2>"$RUNNER_TEMP/inspect.err"); then
-              jq -r --arg key "$2" '.config.Labels[$key] // ""' <<< "$config"
-            elif ! grep -Eq 'manifest unknown|name unknown' "$RUNNER_TEMP/inspect.err"; then
-              cat "$RUNNER_TEMP/inspect.err" >&2
-              return 1
-            fi
-          }
-
-          last_release=
-          last_url=
-          if [[ $GITHUB_EVENT_NAME == schedule ]]; then
-            last_release=$(read_label release org.opencontainers.image.version)
-            last_url=$(read_label latest org.opencontainers.image.url)
-            echo "Release: upstream=$release last-built=${last_release:-none}"
-            echo "Master: upstream=$commit last-built=${last_url##*/}"
-          fi
-          matrix=$(jq -cn --arg release "$release" --arg commit "$commit" \
-            --arg last_release "$last_release" --arg last_commit "${last_url##*/}" '[
-              ({source: "release", ref: ("refs/tags/" + $release), tag: $release} | select($release != $last_release)),
-              ({source: "master", ref: $commit, tag: "latest"} | select($commit != $last_commit))
+          matrix=$(jq -cn --arg release "$release" --arg commit "$commit" '[
+              {source: "release", ref: ("refs/tags/" + $release), tag: $release},
+              {source: "master", ref: $commit, tag: "latest"}
             ]')
           echo "Selected builds for $GITHUB_EVENT_NAME: $matrix"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
@@ -81,7 +49,6 @@ jobs:
   build-image:
     name: Build upstream ${{ matrix.source }}
     needs: select
-    if: needs.select.outputs.matrix != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

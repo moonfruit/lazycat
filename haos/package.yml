@@ -1,13 +1,13 @@
 package: com.github.moonfruit.haos
-version: 0.6.0
+version: 0.6.1
 name: Home Assistant OS
-description: 在独立的 x86-64 虚拟机中运行的 Home Assistant OS
+description: 在懒猫微服上运行 Home Assistant OS。需要支持 KVM 的 x86-64 宿主和名为 enp2s0 的有线网口。
 homepage: https://www.home-assistant.io/
 min_os_version: 1.5.0
 locales:
   en-US:
     name: Home Assistant OS
-    description: Home Assistant OS which runs in an x86-64 VM
+    description: Run Home Assistant OS on an x86-64 LazyCat host with KVM and an Ethernet interface named enp2s0.
 permissions:
   required:
     - device.kvm
