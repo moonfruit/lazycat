@@ -7,6 +7,8 @@ on:
       - httpbin/lzc-*
       - httpbin/package.yml
       - httpbin/update.sh
+      - docker/httpbin/**
+      - .github/workflows/build-httpbin.yml
       - scripts/lpk/**
       - .github/workflows/publish-httpbin.yml
   schedule:
@@ -15,6 +17,10 @@ on:
     inputs:
       check_upstream:
         description: Check for a new stable PSF image version
+        type: boolean
+        default: false
+      rebuild_image:
+        description: Rebuild the current patched image
         type: boolean
         default: false
 
@@ -30,85 +36,134 @@ defaults:
     shell: bash
 
 jobs:
-  prepare:
+  select:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
     outputs:
       revision: ${{ steps.select.outputs.revision }}
+      version: ${{ steps.select.outputs.version }}
+      image_version: ${{ steps.select.outputs.image_version }}
+      image: ${{ steps.select.outputs.image }}
+      changed: ${{ steps.select.outputs.changed }}
       publish: ${{ steps.select.outputs.publish }}
+      build_image: ${{ steps.select.outputs.build_image }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: main
-      - name: Check the upstream image
-        if: github.event_name == 'schedule' || inputs.check_upstream
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check for a stable upstream version
+        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.check_upstream
         run: ./httpbin/update.sh -N
-      - name: Verify image pin and detect manifest changes
-        id: changes
-        run: |
-          version=$(yq -er '.version' httpbin/lzc-manifest.yml)
-          image=$(yq -er '.services.httpbin.image' httpbin/lzc-manifest.yml)
-          prefix="ghcr.io/psf/httpbin:$version@sha256:"
-          [[ $image == "$prefix"* && ${image#"$prefix"} =~ ^[0-9a-f]{64}$ ]]
-          if git diff --quiet -- httpbin/lzc-manifest.yml; then
-            echo 'image=false' >> "$GITHUB_OUTPUT"
-          else
-            echo 'image=true' >> "$GITHUB_OUTPUT"
-          fi
-      - uses: actions/setup-node@v7
-        if: steps.changes.outputs.image == 'true' || github.event_name == 'push'
-        with:
-          node-version: '24'
-          package-manager-cache: false
-      - name: Test package version and pinned PSF image
-        if: steps.changes.outputs.image == 'true' || github.event_name == 'push'
-        run: |
-          npm install -g @lazycatcloud/lzc-cli@2.0.9
-          lzc-cli project build httpbin -o "$RUNNER_TEMP/httpbin.lpk"
-          lzc-cli lpk info "$RUNNER_TEMP/httpbin.lpk" | tee "$RUNNER_TEMP/lpk-info"
-          version=$(yq -r '.version' httpbin/lzc-manifest.yml)
-          grep -Fx "version: $version" "$RUNNER_TEMP/lpk-info"
-          grep -Fx 'package: com.github.moonfruit.httpbin' "$RUNNER_TEMP/lpk-info"
-          image=$(yq -r '.services.httpbin.image' httpbin/lzc-manifest.yml)
-          read -r -a command <<< "$(yq -r '.services.httpbin.command // ""' httpbin/lzc-manifest.yml)"
-          docker run -d --name httpbin -p 127.0.0.1:8000:8080 "$image" "${command[@]}"
-          curl -fsS --retry 12 --retry-all-errors --retry-delay 2 \
-            'http://127.0.0.1:8000/get?source=lazycat' | jq -e '.args.source == "lazycat"'
-          installed=$(docker exec httpbin /opt/httpbin/bin/python -c 'from importlib.metadata import version; print(version("httpbin"))')
-          [[ $installed == "$version" ]]
-      - name: Record the new upstream version
-        if: steps.changes.outputs.image == 'true'
-        run: |
-          version=$(yq -er '.version' httpbin/lzc-manifest.yml)
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- httpbin/lzc-manifest.yml
-          git commit -m "chore(httpbin): update runtime image for LPK $version"
-          git push origin HEAD:main
-      - name: Select release or repair a missing catalog deployment
+      - name: Select the image and LPK release
         id: select
         env:
-          EVENT: ${{ github.event_name }}
           CHECK_UPSTREAM: ${{ inputs.check_upstream }}
-          IMAGE_CHANGED: ${{ steps.changes.outputs.image }}
+          REBUILD_IMAGE: ${{ inputs.rebuild_image }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          version=$(yq -er '.version' httpbin/lzc-manifest.yml)
+          [[ $version =~ ^([0-9]+\.[0-9]+\.[0-9]+)(\.[1-9][0-9]*)?$ ]]
+          image_version=${BASH_REMATCH[1]}
+          image=$(yq -er '.services.httpbin.image' httpbin/lzc-manifest.yml)
+          changed=false
+          git diff --quiet -- httpbin/lzc-manifest.yml || changed=true
+          build_image=false
+          if [[ -f docker/httpbin/$image_version/Dockerfile ]]; then
+            [[ $image == "ghcr.io/moonfruit/httpbin:$image_version" ]]
+            if [[ $changed == true || $REBUILD_IMAGE == true ]]; then
+              build_image=true
+            elif [[ $GITHUB_EVENT_NAME == push ]] && ! git diff --quiet "$BEFORE" HEAD -- \
+                "docker/httpbin/$image_version" docker/httpbin/smoke.sh .github/workflows/build-httpbin.yml; then
+              build_image=true
+            fi
+          else
+            [[ $image == "ghcr.io/psf/httpbin:$image_version" ]]
+          fi
           publish=true
-          if [[ "$IMAGE_CHANGED" == false && ( "$EVENT" == schedule || "$CHECK_UPSTREAM" == true ) ]]; then
-            version=$(yq -r '.version' httpbin/lzc-manifest.yml)
+          if [[ $changed == false && $build_image == false && ( $GITHUB_EVENT_NAME == schedule || $CHECK_UPSTREAM == true ) ]]; then
             url="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/source/v2/index.json"
             if curl -fsSL --max-time 30 "$url" | jq -es --arg v "$version" \
                 'any(.[].apps[]; .packageId == "com.github.moonfruit.httpbin" and .latestVersion.version == $v)'; then
               publish=false
             fi
           fi
-          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          {
+            echo "revision=$(git rev-parse HEAD)"
+            echo "version=$version"
+            echo "image_version=$image_version"
+            echo "image=$image"
+            echo "changed=$changed"
+            echo "publish=$publish"
+            echo "build_image=$build_image"
+          } >> "$GITHUB_OUTPUT"
+
+  build-image:
+    needs: select
+    if: needs.select.outputs.build_image == 'true'
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    uses: ./.github/workflows/build-httpbin.yml
+    with:
+      version: ${{ needs.select.outputs.image_version }}
+      revision: ${{ needs.select.outputs.revision }}
+
+  prepare:
+    needs: [select, build-image]
+    if: >-
+      ${{ !cancelled() && needs.select.result == 'success' && needs.select.outputs.publish == 'true' &&
+      (needs.build-image.result == 'success' || needs.build-image.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      revision: ${{ steps.record.outputs.revision }}
+    env:
+      LPK_VERSION: ${{ needs.select.outputs.version }}
+      HTTPBIN_IMAGE: ${{ needs.select.outputs.image }}
+      IMAGE_VERSION: ${{ needs.select.outputs.image_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.select.outputs.revision }}
+      - name: Apply selected versions to the manifest
+        if: needs.select.outputs.changed == 'true'
+        run: |
+          yq -i '.version = strenv(LPK_VERSION) | .services.httpbin.image = strenv(HTTPBIN_IMAGE)' httpbin/lzc-manifest.yml
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Test the package and its public image
+        run: |
+          npm install -g @lazycatcloud/lzc-cli@2.0.9
+          lzc-cli project build httpbin -o "$RUNNER_TEMP/httpbin.lpk"
+          lzc-cli lpk info "$RUNNER_TEMP/httpbin.lpk" | tee "$RUNNER_TEMP/lpk-info"
+          grep -Fx "version: $LPK_VERSION" "$RUNNER_TEMP/lpk-info"
+          grep -Fx 'package: com.github.moonfruit.httpbin' "$RUNNER_TEMP/lpk-info"
+          skopeo inspect --no-creds --retry-times 3 --raw "docker://$HTTPBIN_IMAGE" >/dev/null
+          bash docker/httpbin/smoke.sh "$HTTPBIN_IMAGE" "$IMAGE_VERSION" linux/amd64
+      - name: Record the selected release revision
+        id: record
+        env:
+          CHANGED: ${{ needs.select.outputs.changed }}
+        run: |
+          if [[ $CHANGED == true ]]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -- httpbin/lzc-manifest.yml
+            git commit -m "chore(httpbin): update runtime image for LPK $LPK_VERSION"
+            git push origin HEAD:main
+          fi
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   release:
     needs: prepare
-    if: needs.prepare.outputs.publish == 'true'
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -131,6 +186,7 @@ jobs:
 
   index:
     needs: release
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -152,6 +208,7 @@ jobs:
 
   deploy:
     needs: index
+    if: ${{ !cancelled() && needs.index.result == 'success' }}
     runs-on: ubuntu-24.04
     environment:
       name: github-pages

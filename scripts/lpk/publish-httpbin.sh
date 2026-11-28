@@ -8,7 +8,7 @@ info=$(lzc-cli lpk info "$out/app.lpk")
 echo "$info"
 version=$(sed -n 's/^version: //p' <<< "$info")
 package=$(sed -n 's/^package: //p' <<< "$info")
-[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $package == com.github.moonfruit.httpbin ]]
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[1-9][0-9]*)?$ && $package == com.github.moonfruit.httpbin ]]
 tag="lpk-httpbin-v$version"
 asset="httpbin-$version.lpk"
 mv "$out/app.lpk" "$out/$asset"

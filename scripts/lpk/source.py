@@ -15,7 +15,7 @@ def build_catalog(base_url, releases):
     versions = []
     for release in releases:
         tag = release["tag_name"]
-        match = re.fullmatch(r"lpk-httpbin-v(\d+\.\d+\.\d+)", tag)
+        match = re.fullmatch(r"lpk-httpbin-v(\d+\.\d+\.\d+(?:\.[1-9]\d*)?)", tag)
         if not match or release["draft"] or release["prerelease"]:
             continue
         version = match[1]
