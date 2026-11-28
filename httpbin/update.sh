@@ -17,9 +17,6 @@ if ! printf '%s\n' "$base" "$latest" | sort -V -C; then
 fi
 
 image="$upstream:$latest"
-if [[ -f ../docker/httpbin/$latest/Dockerfile ]]; then
-    image="ghcr.io/moonfruit/httpbin:$latest"
-fi
 next=$latest
 if [[ $base == "$latest" ]]; then
     if [[ $(yq -er '.services.httpbin.image' lzc-manifest.yml) == "$image" ]]; then

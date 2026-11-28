@@ -6,10 +6,8 @@
 https://moonfruit.github.io/lazycat/source/v2/index.json
 ```
 
-GitHub Actions 每天台北时间 05:43 检查 `ghcr.io/psf/httpbin` 的稳定版本标签。LPK 直接引用版本标签。镜像仓库可以为同一标签重新构建镜像；具体拉取时间取决于设备。新上游版本先用镜像的默认命令启动并测试 `/get`，通过后才发布 LPK。
+LPK 直接使用官方镜像 `ghcr.io/psf/httpbin:<上游版本>`。在 `0.10.4` 中，Gunicorn 26.0.0 的默认 gevent worker 要求 gevent ≥24.10.1，镜像内装的是 24.2.1。LPK 在 `lzc-manifest.yml` 中改用 Gunicorn 自带的 `gthread` worker，使用 4 个线程监听 8080。已使用自有镜像的用户可通过喵喵升级至 `0.10.4.3`。
 
-- 默认直接使用 `ghcr.io/psf/httpbin:<上游版本>`。需要修复某一版本时，在 `docker/httpbin/<上游版本>/Dockerfile` 中基于同版本 PSF 镜像修改。工作流测试 amd64 和 arm64，通过后发布 `ghcr.io/moonfruit/httpbin:<上游版本>`。下一版单独判断是否需要修复。
-- LPK 前三段跟随上游版本。同一版本切换镜像来源时，更新脚本递增第四段；仅修改打包内容时，维护者手动递增第四段。每个 LPK 版本有独立的 Release、SHA-256 和字节数记录，软件源会重新下载附件校验。
-- `0.10.4.2` 使用自有镜像 `ghcr.io/moonfruit/httpbin:0.10.4`。PSF 原镜像的 Gunicorn 26.0.0 要求 gevent ≥24.10.1，实际打包的是 24.2.1。升级 gevent 需要 greenlet 3，而 HttpBin 0.10.4 在 Python 3.10 上声明了 `greenlet<3`。自有镜像用 Python 3.13 重建虚拟环境，安装 gevent 26.9.0 和 greenlet 3.5.6，保留 PSF 的默认 gevent 启动脚本。工作流验证依赖一致性、实际 worker 和 `/get` 响应。
+GitHub Actions 每天台北时间 05:43 检查 PSF 的稳定版本标签。新版本发布前，CI 读取成品 LPK 中的镜像和启动命令，在 amd64、arm64 上分别检查 `/get` 和容器内的 HttpBin 版本。LPK 前三段跟随上游版本，同一上游版本的打包调整使用第四段修订号。每个修订有独立的 Release，软件源索引会校验已发布附件的 SHA-256 和大小。
 
-手动运行 **Publish HttpBin LPK and software source** 可从现有 Release 恢复索引。勾选 **Check for a new stable PSF image version** 会立即检查上游；勾选 **Rebuild the current patched image** 会重新构建当前版本的自有镜像。
+手动运行 **Publish HttpBin LPK and software source** 可以从现有 Release 恢复索引。勾选 **Check for a new stable PSF image version** 可以立即检查上游。

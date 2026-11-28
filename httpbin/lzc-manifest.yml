@@ -1,6 +1,6 @@
 name: HttpBin
 package: com.github.moonfruit.httpbin
-version: 0.10.4.2
+version: 0.10.4.3
 description: HTTP Request & Response Service, written in Python + Flask
 license: https://choosealicense.com/licenses/isc/
 homepage: https://github.com/psf/httpbin
@@ -15,4 +15,5 @@ application:
       use_backend_host: false
 services:
   httpbin:
-    image: ghcr.io/moonfruit/httpbin:0.10.4
+    image: ghcr.io/psf/httpbin:0.10.4
+    command: /opt/httpbin/bin/gunicorn --bind 0.0.0.0:8080 --worker-class gthread --threads 4 httpbin:app

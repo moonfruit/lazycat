@@ -7,8 +7,6 @@ on:
       - httpbin/lzc-*
       - httpbin/package.yml
       - httpbin/update.sh
-      - docker/httpbin/**
-      - .github/workflows/build-httpbin.yml
       - scripts/lpk/**
       - .github/workflows/publish-httpbin.yml
   schedule:
@@ -17,10 +15,6 @@ on:
     inputs:
       check_upstream:
         description: Check for a new stable PSF image version
-        type: boolean
-        default: false
-      rebuild_image:
-        description: Rebuild the current patched image
         type: boolean
         default: false
 
@@ -36,134 +30,80 @@ defaults:
     shell: bash
 
 jobs:
-  select:
+  prepare:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     outputs:
-      revision: ${{ steps.select.outputs.revision }}
-      version: ${{ steps.select.outputs.version }}
-      image_version: ${{ steps.select.outputs.image_version }}
-      image: ${{ steps.select.outputs.image }}
-      changed: ${{ steps.select.outputs.changed }}
       publish: ${{ steps.select.outputs.publish }}
-      build_image: ${{ steps.select.outputs.build_image }}
+      revision: ${{ steps.record.outputs.revision }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: main
-          fetch-depth: 0
-          persist-credentials: false
       - name: Check for a stable upstream version
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.check_upstream
+        if: github.event_name != 'workflow_dispatch' || inputs.check_upstream
         run: ./httpbin/update.sh -N
-      - name: Select the image and LPK release
+      - name: Select release or repair a missing catalog deployment
         id: select
         env:
           CHECK_UPSTREAM: ${{ inputs.check_upstream }}
-          REBUILD_IMAGE: ${{ inputs.rebuild_image }}
-          BEFORE: ${{ github.event.before }}
         run: |
-          version=$(yq -er '.version' httpbin/lzc-manifest.yml)
-          [[ $version =~ ^([0-9]+\.[0-9]+\.[0-9]+)(\.[1-9][0-9]*)?$ ]]
-          image_version=${BASH_REMATCH[1]}
-          image=$(yq -er '.services.httpbin.image' httpbin/lzc-manifest.yml)
           changed=false
           git diff --quiet -- httpbin/lzc-manifest.yml || changed=true
-          build_image=false
-          if [[ -f docker/httpbin/$image_version/Dockerfile ]]; then
-            [[ $image == "ghcr.io/moonfruit/httpbin:$image_version" ]]
-            if [[ $changed == true || $REBUILD_IMAGE == true ]]; then
-              build_image=true
-            elif [[ $GITHUB_EVENT_NAME == push ]] && ! git diff --quiet "$BEFORE" HEAD -- \
-                "docker/httpbin/$image_version" docker/httpbin/smoke.sh .github/workflows/build-httpbin.yml; then
-              build_image=true
-            fi
-          else
-            [[ $image == "ghcr.io/psf/httpbin:$image_version" ]]
-          fi
           publish=true
-          if [[ $changed == false && $build_image == false && ( $GITHUB_EVENT_NAME == schedule || $CHECK_UPSTREAM == true ) ]]; then
+          if [[ $changed == false && ( $GITHUB_EVENT_NAME == schedule || $CHECK_UPSTREAM == true ) ]]; then
+            version=$(yq -er '.version' httpbin/lzc-manifest.yml)
             url="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/source/v2/index.json"
             if curl -fsSL --max-time 30 "$url" | jq -es --arg v "$version" \
                 'any(.[].apps[]; .packageId == "com.github.moonfruit.httpbin" and .latestVersion.version == $v)'; then
               publish=false
             fi
           fi
-          {
-            echo "revision=$(git rev-parse HEAD)"
-            echo "version=$version"
-            echo "image_version=$image_version"
-            echo "image=$image"
-            echo "changed=$changed"
-            echo "publish=$publish"
-            echo "build_image=$build_image"
-          } >> "$GITHUB_OUTPUT"
-
-  build-image:
-    needs: select
-    if: needs.select.outputs.build_image == 'true'
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
-    uses: ./.github/workflows/build-httpbin.yml
-    with:
-      version: ${{ needs.select.outputs.image_version }}
-      revision: ${{ needs.select.outputs.revision }}
-
-  prepare:
-    needs: [select, build-image]
-    if: >-
-      ${{ !cancelled() && needs.select.result == 'success' && needs.select.outputs.publish == 'true' &&
-      (needs.build-image.result == 'success' || needs.build-image.result == 'skipped') }}
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    outputs:
-      revision: ${{ steps.record.outputs.revision }}
-    env:
-      LPK_VERSION: ${{ needs.select.outputs.version }}
-      HTTPBIN_IMAGE: ${{ needs.select.outputs.image }}
-      IMAGE_VERSION: ${{ needs.select.outputs.image_version }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.select.outputs.revision }}
-      - name: Apply selected versions to the manifest
-        if: needs.select.outputs.changed == 'true'
-        run: |
-          yq -i '.version = strenv(LPK_VERSION) | .services.httpbin.image = strenv(HTTPBIN_IMAGE)' httpbin/lzc-manifest.yml
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v7
+        if: steps.select.outputs.publish == 'true'
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Test the package and its public image
+      - uses: docker/setup-qemu-action@v4
+        if: steps.select.outputs.publish == 'true'
+        with:
+          platforms: arm64
+      - name: Test both architectures with the packaged startup command
+        if: steps.select.outputs.publish == 'true'
         run: |
           npm install -g @lazycatcloud/lzc-cli@2.0.9
           lzc-cli project build httpbin -o "$RUNNER_TEMP/httpbin.lpk"
           lzc-cli lpk info "$RUNNER_TEMP/httpbin.lpk" | tee "$RUNNER_TEMP/lpk-info"
-          grep -Fx "version: $LPK_VERSION" "$RUNNER_TEMP/lpk-info"
+          version=$(yq -er '.version' httpbin/lzc-manifest.yml)
+          grep -Fx "version: $version" "$RUNNER_TEMP/lpk-info"
           grep -Fx 'package: com.github.moonfruit.httpbin' "$RUNNER_TEMP/lpk-info"
-          skopeo inspect --no-creds --retry-times 3 --raw "docker://$HTTPBIN_IMAGE" >/dev/null
-          bash docker/httpbin/smoke.sh "$HTTPBIN_IMAGE" "$IMAGE_VERSION" linux/amd64
-      - name: Record the selected release revision
+          unzip -p "$RUNNER_TEMP/httpbin.lpk" manifest.yml > "$RUNNER_TEMP/manifest.yml"
+          for arch in amd64 arm64; do
+            bash scripts/lpk/smoke-httpbin.sh "$RUNNER_TEMP/manifest.yml" "linux/$arch"
+          done
+      - name: Record tested release revision
+        if: steps.select.outputs.publish == 'true'
         id: record
         env:
-          CHANGED: ${{ needs.select.outputs.changed }}
+          CHANGED: ${{ steps.select.outputs.changed }}
         run: |
           if [[ $CHANGED == true ]]; then
+            version=$(yq -er '.version' httpbin/lzc-manifest.yml)
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add -- httpbin/lzc-manifest.yml
-            git commit -m "chore(httpbin): update runtime image for LPK $LPK_VERSION"
+            git commit -m "chore(httpbin): update runtime image for LPK $version"
             git push origin HEAD:main
           fi
           echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   release:
     needs: prepare
-    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    if: needs.prepare.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -186,7 +126,6 @@ jobs:
 
   index:
     needs: release
-    if: ${{ !cancelled() && needs.release.result == 'success' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -208,7 +147,6 @@ jobs:
 
   deploy:
     needs: index
-    if: ${{ !cancelled() && needs.index.result == 'success' }}
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
