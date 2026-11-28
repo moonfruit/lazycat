@@ -129,7 +129,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_URL: ${{ steps.pages.outputs.base_url }}
-        run: python3 scripts/lpk/source.py "$BASE_URL" site/source/v2/index.json
+        run: |
+          python3 -B -m unittest discover -s scripts/lpk
+          python3 scripts/lpk/source.py "$BASE_URL" site/source/v2/index.json
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

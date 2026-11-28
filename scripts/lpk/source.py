@@ -49,11 +49,15 @@ def checksum(response, copy=None):
 
 def package_icon(package):
     package.seek(0)
-    if zipfile.is_zipfile(package):
+    # A v2 TAR may itself contain a ZIP near its end (e.g. HAOS's OIDC plugin).
+    # Probe the outer TAR header before falling back to the legacy ZIP format.
+    try:
+        outer = tarfile.open(fileobj=package, mode="r:")
+    except tarfile.ReadError:
+        package.seek(0)
         with zipfile.ZipFile(package) as archive, archive.open("icon.png") as icon:
             return icon.read()
-    package.seek(0)
-    with tarfile.open(fileobj=package) as archive:
+    with outer as archive:
         member = archive.getmember("icon.png")
         if not member.isfile():
             raise ValueError("Expected a regular icon.png inside the LPK")
