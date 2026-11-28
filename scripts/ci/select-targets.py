@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select registered release targets for a push, daily check or manual run."""
+"""Select registered release targets for a push, scheduled check or manual run."""
 
 import json
 import os
@@ -16,7 +16,7 @@ SHARED = {
 }
 
 
-def select(kind, event, target, before):
+def select(kind, event, target, before, schedule=None):
     entries = json.loads(Path(REGISTRY).read_text())[kind]
     if not all(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", key) for key in entries):
         raise ValueError(f"Invalid slug in {kind} registry")
@@ -29,6 +29,12 @@ def select(kind, event, target, before):
         if target not in entries:
             raise ValueError(f"Unknown {kind} target: {target}")
         return [target]
+    if kind == "images" and event == "schedule":
+        if schedule == "23 3 * * 1":
+            return [slug for slug, config in entries.items() if config.get("workflow") == "qemu"]
+        if schedule == "29 22 * * *":
+            return [slug for slug, config in entries.items() if "versionEnv" in config]
+        raise ValueError(f"Unknown image schedule: {schedule}")
     if event != "push" or not before or not before.strip("0"):
         return list(entries)
 
@@ -49,10 +55,11 @@ def select(kind, event, target, before):
             return list(entries)  # Rebuild the catalog after withdrawing an app.
     prefix = "docker/" if kind == "images" else ""
     return [slug for slug, config in entries.items()
-            if config != previous.get(slug) or any(path.startswith(f"{prefix}{slug}/") for path in paths)]
+            if config != previous.get(slug) or any(path.startswith(f"{prefix}{slug}/") for path in paths)
+            or (kind == "images" and config.get("workflow") == "qemu" and ".github/workflows/build-qemu.yml" in paths)]
 
 
 if __name__ == "__main__":
     kind, = sys.argv[1:]
     print(json.dumps(select(kind, os.environ["EVENT"], os.environ.get("TARGET") or "all",
-                            os.environ.get("BEFORE")), separators=(",", ":")))
+                            os.environ.get("BEFORE"), os.environ.get("SCHEDULE")), separators=(",", ":")))

@@ -5,7 +5,7 @@ image=$1
 version=$2
 dir=$3
 here=$(cd "$(dirname "$0")" && pwd)
-tags=$(skopeo list-tags "docker://$image")
+tags=$(skopeo list-tags --retry-times 3 "docker://$image")
 revision=$(jq -er --arg prefix "$version-r" '
     [.Tags[] | select(startswith($prefix)) | ltrimstr($prefix) |
      select(test("^[1-9][0-9]*$")) | tonumber] | max // 0
@@ -33,22 +33,9 @@ if [[ $changed == true ]]; then
     revision=$((revision + 1))
     digest=$(skopeo inspect --format '{{.Digest}}' "oci-archive:$dir/candidate.oci")
 fi
-# Check aliases even on a no-op so a partially completed release can be repaired.
-publish_tags=()
-for tag in "$version-r$revision" "$version" latest; do
-    if jq -e --arg t "$tag" '.Tags | index($t) != null' <<< "$tags" >/dev/null; then
-        current=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://$image:$tag")
-        if [[ $current == "$digest" ]]; then continue; fi
-        if [[ $tag == "$version-r$revision" ]]; then
-            echo "Revision $tag already points to another image" >&2
-            exit 1
-        fi
-    fi
-    publish_tags+=("$tag")
-done
 {
     echo "changed=$changed"
     echo "digest=$digest"
-    echo "tags=${publish_tags[*]}"
+    echo "revision=$revision"
 } >> "$GITHUB_OUTPUT"
-echo "QEMU $version-r$revision, changed=$changed, tags to publish: ${publish_tags[*]:-none}"
+echo "QEMU $version-r$revision, changed=$changed, digest=$digest"

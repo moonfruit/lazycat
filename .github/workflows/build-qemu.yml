@@ -1,21 +1,14 @@
 name: Build image for qemu
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/build-qemu.yml"
-      - "docker/qemu/**"
-  schedule:
-    - cron: "23 3 * * 1"
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      sha:
+        type: string
+        required: true
 
 env:
   REGISTRY: ghcr.io
-
-concurrency:
-  group: qemu-ghcr-release
-  cancel-in-progress: false
 
 jobs:
   build-image:
@@ -28,14 +21,15 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
 
       - name: Check content comparison
         run: python3 -B -m unittest discover -s docker/qemu
 
       - name: Select image and version
         run: |
-          version=$(sed -n 's/^ARG QEMU_VERSION=//p' docker/qemu/Dockerfile)
-          [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          version=$(scripts/images/version.sh qemu)
           echo "VERSION=$version" >> "$GITHUB_ENV"
           echo "IMAGE=$REGISTRY/${GITHUB_REPOSITORY_OWNER,,}/qemu" >> "$GITHUB_ENV"
 
@@ -54,6 +48,7 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: type=raw,value=${{ env.VERSION }}
+          labels: org.opencontainers.image.revision=${{ inputs.sha }}
 
       - name: Build fresh candidate
         uses: docker/build-push-action@v7
@@ -69,6 +64,11 @@ jobs:
             type=oci,dest=${{ runner.temp }}/candidate.oci
             type=tar,dest=${{ runner.temp }}/candidate.tar
 
+      - name: Smoke-test the candidate filesystem and runtime
+        run: |
+          skopeo copy "oci-archive:$RUNNER_TEMP/candidate.oci" docker-daemon:qemu-ci:candidate
+          docker/qemu/smoke.sh qemu-ci:candidate "$VERSION"
+
       - name: Compare with last published revision
         id: release
         run: docker/qemu/compare-release.sh "$IMAGE" "$VERSION" "$RUNNER_TEMP"
@@ -77,7 +77,7 @@ jobs:
         if: steps.release.outputs.changed == 'true'
         env:
           DIGEST: ${{ steps.release.outputs.digest }}
-        run: skopeo copy --all --preserve-digests "oci-archive:$RUNNER_TEMP/candidate.oci" "docker://$IMAGE@$DIGEST"
+        run: skopeo copy --retry-times 3 --all --preserve-digests "oci-archive:$RUNNER_TEMP/candidate.oci" "docker://$IMAGE@$DIGEST"
 
       - name: Attest new revision
         if: steps.release.outputs.changed == 'true'
@@ -87,14 +87,8 @@ jobs:
           subject-digest: ${{ steps.release.outputs.digest }}
           push-to-registry: true
 
-      - name: Publish revision and aliases
-        if: steps.release.outputs.tags != ''
+      - name: Publish revision and repair aliases
         env:
           DIGEST: ${{ steps.release.outputs.digest }}
-          TAGS: ${{ steps.release.outputs.tags }}
-        run: |
-          git fetch --quiet origin main
-          git diff --exit-code HEAD FETCH_HEAD -- docker/qemu .github/workflows/build-qemu.yml
-          for tag in $TAGS; do
-            docker buildx imagetools create --prefer-index=false --tag "$IMAGE:$tag" "$IMAGE@$DIGEST"
-          done
+          REVISION: ${{ steps.release.outputs.revision }}
+        run: docker/qemu/promote.sh "$IMAGE" "$VERSION" "$REVISION" "$DIGEST"

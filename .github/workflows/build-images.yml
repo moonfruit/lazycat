@@ -7,10 +7,12 @@ on:
       - "docker/**"
       - ".github/release-targets.json"
       - ".github/workflows/build-images.yml"
+      - ".github/workflows/build-qemu.yml"
       - "scripts/ci/**"
       - "scripts/images/**"
   schedule:
-    - cron: "29 22 * * *" # 06:29 Asia/Taipei
+    - cron: "29 22 * * *" # Alpine, 06:29 Asia/Taipei
+    - cron: "23 3 * * 1"  # QEMU, Mondays at 03:23 UTC
   workflow_dispatch:
     inputs:
       target:
@@ -32,6 +34,7 @@ jobs:
     outputs:
       targets: ${{ steps.prepare.outputs.targets }}
       repairs: ${{ steps.prepare.outputs.repairs }}
+      qemu: ${{ steps.prepare.outputs.qemu }}
       sha: ${{ steps.prepare.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
@@ -52,7 +55,20 @@ jobs:
           EVENT: ${{ github.event_name }}
           TARGET: ${{ inputs.target || 'all' }}
           BEFORE: ${{ github.event.before }}
+          SCHEDULE: ${{ github.event.schedule }}
         run: scripts/images/prepare.sh
+
+  qemu:
+    needs: prepare
+    if: needs.prepare.outputs.qemu == 'true'
+    uses: ./.github/workflows/build-qemu.yml
+    with:
+      sha: ${{ needs.prepare.outputs.sha }}
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
 
   build:
     name: Build ${{ matrix.image }}

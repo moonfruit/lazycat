@@ -10,8 +10,8 @@ refresh_pins() {
     local paths=(.github/workflows/build-images.yml scripts/images scripts/ci)
     workflow_sha=$(git rev-parse HEAD)
     registration=$(jq -ceS '.images' .github/release-targets.json)
-    targets=$(select_images)
     for target in $(jq -r '.[]' <<< "$targets"); do
+        if [[ $target == qemu ]]; then paths+=(.github/workflows/build-qemu.yml); fi
         paths+=("docker/$target" ":(exclude)docker/$target/Dockerfile")
     done
     for attempt in 1 2 3; do
@@ -27,11 +27,16 @@ refresh_pins() {
         git switch --quiet --detach FETCH_HEAD
         for target in $(jq -r '.[]' <<< "$targets"); do
             "docker/$target/update.sh" -N
+            if [[ $target == qemu ]] && ! git diff --quiet -- docker/qemu/Dockerfile; then
+                # Only record a new upstream pin after its packages install and both binaries work.
+                docker build --pull --no-cache --platform linux/amd64 -t qemu-ci:pin docker/qemu
+                docker/qemu/smoke.sh qemu-ci:pin "$(scripts/images/version.sh qemu)"
+            fi
             git add -- "docker/$target/Dockerfile"
         done
         if git diff --cached --quiet; then return 0; fi
         git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m 'chore(images): update Alpine image pins'
+            commit -m 'chore(images): update scheduled image pins'
         if git push origin HEAD:refs/heads/main; then return 0; fi
         echo "Push attempt $attempt failed; checking the latest main before retrying." >&2
     done
@@ -48,9 +53,14 @@ inspect_tag() {
     return 1
 }
 
+targets=$(select_images)
 repairs='[]'
 if [[ $EVENT == schedule ]]; then
     refresh_pins
+fi
+qemu=$(jq -c 'index("qemu") != null' <<< "$targets")
+targets=$(jq -c 'map(select(. != "qemu"))' <<< "$targets")
+if [[ $EVENT == schedule ]]; then
     pending=()
     for target in $(jq -r '.[]' <<< "$targets"); do
         expected=$(scripts/images/source-id.sh "$target")
@@ -70,13 +80,12 @@ if [[ $EVENT == schedule ]]; then
         fi
     done
     targets=$(jq -cn --args '$ARGS.positional' "${pending[@]}")
-else
-    targets=$(select_images)
 fi
-echo "Selected images for $EVENT: $targets"
+echo "Selected images for $EVENT: Alpine=$targets, QEMU=$qemu"
 echo "Version tags to repair: $repairs"
 {
     echo "targets=$targets"
     echo "repairs=$repairs"
+    echo "qemu=$qemu"
     echo "sha=$(git rev-parse HEAD)"
 } >> "$GITHUB_OUTPUT"

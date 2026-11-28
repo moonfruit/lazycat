@@ -5,6 +5,7 @@
   },
   "images": {
     "aria2": {"versionEnv": "ARIA2_VERSION"},
-    "crond": {"versionEnv": "CURL_VERSION"}
+    "crond": {"versionEnv": "CURL_VERSION"},
+    "qemu": {"workflow": "qemu"}
   }
 }
